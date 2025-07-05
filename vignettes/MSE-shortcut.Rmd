@@ -38,8 +38,8 @@ library(plyr)
 library(dplyr)
 library(ggplot2)
 library(patchwork)
-library(doParallel)
-library(foreach)
+library(future)
+library(future.apply)
 
 # Set theme for plots
 theme_set(theme_bw(14))
@@ -317,17 +317,17 @@ if (!is.null(mse_custom)) {
 
 ## Parallel Processing Configuration
 
-The MSE method uses parallel processing by default. You can control the number of cores:
+The MSE method uses parallel processing by default with `future.apply`. You can control the number of workers:
 
 ```{r parallel_config}
-# Run MSE with specific number of cores
+# Run MSE with specific number of workers
 mse_parallel <- MSE(ple4, eql_bh, 
-                    cores = 2,      # Use only 2 cores
+                    workers = 2,    # Use only 2 workers
                     nits = 20,
                     endYear = 2030,
                     seed = 999)
 
-cat("MSE with 2 cores completed:", !is.null(mse_parallel), "\n")
+cat("MSE with 2 workers completed:", !is.null(mse_parallel), "\n")
 ```
 
 # Performance Analysis

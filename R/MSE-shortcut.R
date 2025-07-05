@@ -13,7 +13,7 @@
 #' @param seed Random seed for reproducibility (default: 1233)
 #' @param hcrParams HCR parameters (if NULL, uses benchmark values)
 #' @param bndTac TAC bounds for stability constraints (default: c(0.8, 1.25))
-#' @param cores Number of CPU cores for parallel processing (default: detectCores()-4)
+#' @param workers Number of workers for parallel processing (default: availableCores()-2)
 #' @param ... Additional arguments
 #'
 #' @return A list containing MSE results for each stock
@@ -25,7 +25,7 @@
 #' 2. **Recruitment Analysis**: Extracts and samples historical recruitment residuals
 #' 3. **Observation Error**: Generates observation errors for future projections
 #' 4. **HCR Parameters**: Sets up harvest control rule parameters from benchmark values
-#' 5. **Parallel Simulation**: Runs Monte Carlo simulations across multiple cores
+#' 5. **Parallel Simulation**: Runs Monte Carlo simulations across multiple workers
 #' 6. **Results Collection**: Compiles and returns MSE results
 #'
 #' The method supports both single stocks and multiple stocks, and can use
@@ -55,16 +55,16 @@ setGeneric("MSE", function(object, eql, ...) standardGeneric("MSE"))
 #' @export
 setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
           function(object, eql, endYear = 2050, nits = 100, seed = 1233,
-                   hcrParams = NULL, bndTac = c(0.8, 1.25), cores = NULL, ...) {
+                   hcrParams = NULL, bndTac = c(0.8, 1.25), workers = NULL, ...) {
             
-            # Set up parallel processing
-            if (is.null(cores)) {
-              cores <- max(1, parallel::detectCores() - 4)
+            # Set up parallel processing with future.apply
+            if (is.null(workers)) {
+              workers <- max(1, future::availableCores() - 2)
             }
             
-            # Register parallel backend
-            cl <- parallel::makeCluster(cores)
-            doParallel::registerDoParallel(cl)
+            # Set up future plan
+            old_plan <- future::plan(future::multisession, workers = workers)
+            on.exit(future::plan(old_plan), add = TRUE)
             
             # Set seed for reproducibility
             set.seed(seed)
@@ -76,7 +76,6 @@ setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
             fmsy <- benchmark(object)["fmsy"]
             if (is.na(fmsy)) {
               warning("FMSY not available in benchmark. Returning NULL.")
-              parallel::stopCluster(cl)
               return(NULL)
             }
             
@@ -84,7 +83,6 @@ setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
             recResiduals <- attributes(eql)$rec.residuals
             if (is.null(recResiduals)) {
               warning("Recruitment residuals not found in equilibrium object.")
-              parallel::stopCluster(cl)
               return(NULL)
             }
             
@@ -129,9 +127,6 @@ setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
               return(NULL)
             })
             
-            # Clean up parallel processing
-            parallel::stopCluster(cl)
-            
             return(result)
           })
 
@@ -139,16 +134,16 @@ setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
 #' @export
 setMethod("MSE", signature(object = "FLStocks", eql = "FLBRPs"),
           function(object, eql, endYear = 2050, nits = 100, seed = 1233,
-                   hcrParams = NULL, bndTac = c(0.8, 1.25), cores = NULL, ...) {
+                   hcrParams = NULL, bndTac = c(0.8, 1.25), workers = NULL, ...) {
             
-            # Set up parallel processing
-            if (is.null(cores)) {
-              cores <- max(1, parallel::detectCores() - 4)
+            # Set up parallel processing with future.apply
+            if (is.null(workers)) {
+              workers <- max(1, future::availableCores() - 2)
             }
             
-            # Register parallel backend
-            cl <- parallel::makeCluster(cores)
-            doParallel::registerDoParallel(cl)
+            # Set up future plan
+            old_plan <- future::plan(future::multisession, workers = workers)
+            on.exit(future::plan(old_plan), add = TRUE)
             
             # Get stock names
             stockNames <- names(object)
@@ -161,13 +156,8 @@ setMethod("MSE", signature(object = "FLStocks", eql = "FLBRPs"),
             # Set seed for reproducibility
             set.seed(seed)
             
-            # Run MSE for each stock in parallel
-            results <- foreach(id = stockNames,
-                             .combine = list,
-                             .maxcombine = length(object),
-                             .packages = c("FLCore", "FLBRP", "FLasher", "FLCandy", "haf")
-            ) %dopar% {
-              
+            # Create MSE function for single stock
+            runSingleMSE <- function(id) {
               # Ensure positive values for stock data
               stk <- ensurePositive(object[[id]])
               
@@ -220,8 +210,8 @@ setMethod("MSE", signature(object = "FLStocks", eql = "FLBRPs"),
               })
             }
             
-            # Clean up parallel processing
-            parallel::stopCluster(cl)
+            # Run MSE for each stock in parallel using future.apply
+            results <- future.apply::future_lapply(stockNames, runSingleMSE)
             
             # Name results
             names(results) <- stockNames

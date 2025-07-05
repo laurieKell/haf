@@ -9,9 +9,8 @@ importFrom(FLCandy, spr0Yr, ftmb, getPriors, calcPriors)
 importFrom(ggplot2, ggplot, geom_rect, geom_polygon, geom_line, geom_vline, geom_hline, annotate, scale_fill_manual, scale_x_continuous, scale_y_continuous, labs, theme, theme_minimal, aes)
 importFrom(methods, setGeneric, setMethod)
 importFrom(stats, median, var, rlnorm)
-importFrom(parallel, detectCores, makeCluster, stopCluster)
-importFrom(foreach, foreach, %dopar%)
-importFrom(doParallel, registerDoParallel)
+importFrom(future, plan, availableCores)
+importFrom(future.apply, future_lapply)
 
 # Export package functions
 export(hcrICESAR)
