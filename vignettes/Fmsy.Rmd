@@ -37,7 +37,11 @@ The analysis includes:
 library(FLCore)
 library(FLBRP)
 library(ggplot2)
+library(FLash)
+library(FLCandy)
 library(haf)
+
+library(plyr)
 library(dplyr)
 
 theme_set(theme_bw(14))
