@@ -29,11 +29,13 @@ knitr::opts_chunk$set(
 
 # Load required packages
 library(FLCore)
-library(ggplotFL)
 library(FLBRP)
+library(ggplotFL)
+
 library(FLasher)
 library(FLAssess)
 library(haf)
+
 library(plyr)
 library(dplyr)
 library(ggplot2)
@@ -81,10 +83,10 @@ The MSE method requires fitted stock-recruitment relationships. Let's fit both B
 
 ```{r srr_fitting}
 # Fit Beverton-Holt stock-recruitment relationship
-eql_bh <- eql(ple4, model = "bevholtSV")
+eqlBh=haf:::eql(ple4, model = "bevholtSV")
 
 # Fit Ricker stock-recruitment relationship  
-eql_rk <- eql(ple4, model = "rickerSV")
+eqlRk=eql(ple4, model = "rickerSV")
 
 # Compare model fits
 logLik_bh <- attributes(eql_bh)$logLik[1]
