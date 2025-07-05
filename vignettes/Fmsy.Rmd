@@ -37,7 +37,7 @@ The analysis includes:
 library(FLCore)
 library(FLBRP)
 library(ggplot2)
-library(FLash)
+library(FLasher)
 library(FLCandy)
 library(haf)
 
