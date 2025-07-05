@@ -28,7 +28,6 @@
 #' }
 #' 
 #' @export
-#' @importFrom FLCore ebiomass
 rfbParams<-function(linf,lc,k,index) {
   
   # Calculate L[F]=M (0.75*lc+0.25*linf)
