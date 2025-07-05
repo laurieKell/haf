@@ -1,4 +1,4 @@
-#' Management Strategy Evaluation (MSE) Method
+#' Management Strategy Evaluation shortcut Method
 #'
 #' @description
 #' Performs Management Strategy Evaluation (MSE) using Monte Carlo simulations
@@ -19,7 +19,7 @@
 #' @return A list containing MSE results for each stock
 #'
 #' @details
-#' The MSE method performs the following steps:
+#' The shortcut method performs the following steps:
 #' 
 #' 1. **Data Preparation**: Ensures positive values for catch, discards, landings, and stock numbers
 #' 2. **Recruitment Analysis**: Extracts and samples historical recruitment residuals
@@ -49,11 +49,11 @@
 #' }
 #'
 #' @export
-setGeneric("MSE", function(object, eql, ...) standardGeneric("MSE"))
+setGeneric("shortcut", function(object, eql, ...) standardGeneric("shortcut"))
 
-#' @rdname MSE
+#' @rdname shortcut
 #' @export
-setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
+setMethod("shortcut", signature(object = "FLStock", eql = "FLBRP"),
           function(object, eql, endYear = 2050, nits = 100, seed = 1233,
                    hcrParams = NULL, bndTac = c(0.8, 1.25), workers = NULL, ...) {
             
@@ -130,9 +130,9 @@ setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
             return(result)
           })
 
-#' @rdname MSE
+#' @rdname shortcut
 #' @export
-setMethod("MSE", signature(object = "FLStocks", eql = "FLBRPs"),
+setMethod("shortcut", signature(object = "FLStocks", eql = "FLBRPs"),
           function(object, eql, endYear = 2050, nits = 100, seed = 1233,
                    hcrParams = NULL, bndTac = c(0.8, 1.25), workers = NULL, ...) {
             

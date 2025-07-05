@@ -58,8 +58,8 @@ setMethod("eql", signature(object="FLStock"),
             attributes(rtn)[["prod"]]   =spFn(rtn)
             attributes(rtn)[["tseries"]]=tseries(object)
             attributes(rtn)[["eb.obs"]] =ebiomass(object)
-            attributes(rtn)[["priors"]] =tryIt(calcPriors(rtn))
-            attributes(rtn)[["prior2"]] =tryIt(getPriors(rtn))
+            attributes(rtn)[["priors"]] =tryIt(FLCandy:::calcPriors(rtn))
+            attributes(rtn)[["prior2"]] =tryIt(FLCandy:::getPriors(rtn))
             
             return(rtn)})
 
