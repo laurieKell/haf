@@ -1,10 +1,10 @@
 ---
-title: "FLRICES: FLR-based Implementation of ICES Harvest Control Rules"
+title: "haf: FLR-based Implementation of ICES Harvest Control Rules"
 author: "Your Name"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{FLRICES: FLR-based Implementation of ICES Harvest Control Rules}
+  %\VignetteIndexEntry{haf: FLR-based Implementation of ICES Harvest Control Rules}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -20,13 +20,13 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-The FLRICES package provides standardized implementations of ICES (International Council for the Exploration of the Sea) harvest control rules within the FLR (Fisheries Library for R) framework. This vignette demonstrates how to use the package to implement different types of harvest control rules for various stock categories.
+The haf package provides standardized implementations of ICES (International Council for the Exploration of the Sea) harvest control rules within the FLR (Fisheries Library for R) framework. This vignette demonstrates how to use the package to implement different types of harvest control rules for various stock categories.
 
 ## Installation and Loading
 
 ```{r install}
 # Load the package
-library(FLRICES)
+library(haf)
 
 # Load required FLR packages
 library(FLCore)
@@ -236,7 +236,7 @@ Add implementation error to simulate real-world conditions:
 
 ## Summary
 
-The FLRICES package provides a comprehensive toolkit for implementing ICES harvest control rules within the FLR framework. Key features include:
+The haf package provides a comprehensive toolkit for implementing ICES harvest control rules within the FLR framework. Key features include:
 
 - **Standardized implementations** of ICES HCRs
 - **Multiple stock categories** support (1, 2, and 3)

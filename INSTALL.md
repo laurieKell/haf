@@ -1,8 +1,8 @@
-# FLRICES Installation Guide
+# haf Installation Guide
 
 ## Prerequisites
 
-Before installing FLRICES, you need to have the following R packages installed:
+Before installing haf, you need to have the following R packages installed:
 
 ### Required Packages
 
@@ -23,9 +23,10 @@ Before installing FLRICES, you need to have the following R packages installed:
 
 ### Optional Packages (for development)
 
-- **testthat** (>= 3.0.0) - For running tests
+- **devtools** - For installing from GitHub
+- **testthat** - For running tests
 - **knitr** - For building vignettes
-- **rmarkdown** - For building documentation
+- **rmarkdown** - For documentation
 
 ## Installation Methods
 
@@ -35,24 +36,32 @@ Before installing FLRICES, you need to have the following R packages installed:
 # Install devtools if not already installed
 if (!require(devtools)) install.packages("devtools")
 
-# Install FLRICES from GitHub
-devtools::install_github("yourusername/FLRICES")
+# Install haf from GitHub
+devtools::install_github("yourusername/haf")
 ```
 
 ### Method 2: Install from Local Source
 
-1. Download or clone the repository
-2. Open R in the package directory
-3. Run:
-   ```r
-   install.packages(".", repos = NULL, type = "source")
-   ```
+If you have downloaded the source code:
 
-### Method 3: Install using R CMD INSTALL
+```r
+# Navigate to the package directory
+setwd("path/to/haf")
 
-From the command line in the package directory:
-```bash
-R CMD INSTALL .
+# Install the package
+install.packages(".", repos = NULL, type = "source")
+```
+
+### Method 3: Install Dependencies First
+
+If you encounter dependency issues:
+
+```r
+# Install FLR packages first
+install.packages(c("FLCore", "FLBRP"), repos = "https://flr-project.org/R")
+
+# Then install haf
+devtools::install_github("yourusername/haf")
 ```
 
 ## Verification
@@ -61,58 +70,60 @@ After installation, verify that the package works correctly:
 
 ```r
 # Load the package
-library(FLRICES)
+library(haf)
 
-# Check package version
-packageVersion("FLRICES")
+# Check version
+packageVersion("haf")
 
-# Run basic tests
-testthat::test_package("FLRICES")
+# Run tests
+testthat::test_package("haf")
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **FLCore not found**: Make sure you have the FLR repository added:
+1. **FLR packages not found**: Make sure you have the FLR repository added:
    ```r
-   options(repos = c(CRAN = "https://cran.r-project.org/",
-                    FLR = "https://flr-project.org/R"))
+   install.packages("FLCore", repos = "https://flr-project.org/R")
    ```
 
-2. **Dependencies missing**: Install missing dependencies:
+2. **Build tools required**: On Windows, you may need Rtools:
    ```r
-   install.packages(c("FLCore", "FLBRP", "ggplot2"))
+   install.packages("devtools")
+   devtools::find_rtools()
    ```
 
-3. **Build tools missing**: On Windows, you may need Rtools:
-   - Download from: https://cran.r-project.org/bin/windows/Rtools/
-   - Add to PATH environment variable
-
-### Platform-Specific Notes
-
-#### Windows
-- Install Rtools for building packages from source
-- Ensure R is in your PATH
-
-#### macOS
-- Install Xcode command line tools: `xcode-select --install`
-- May need to install additional libraries via Homebrew
-
-#### Linux
-- Install build essentials: `sudo apt-get install build-essential` (Ubuntu/Debian)
-- Install R development headers: `sudo apt-get install r-base-dev`
+3. **Permission errors**: Try running R as administrator or use:
+   ```r
+   devtools::install_github("yourusername/haf", force = TRUE)
+   ```
 
 ## Development Installation
 
-For development work, install in development mode:
+For development work:
 
 ```r
-# Install in development mode
-devtools::install(".", reload = TRUE)
+# Clone the repository
+git clone https://github.com/yourusername/haf.git
 
-# Or use load_all for faster development cycle
-devtools::load_all()
+# Set working directory
+setwd("haf")
+
+# Install in development mode
+devtools::install()
+```
+
+## Updating
+
+To update to the latest version:
+
+```r
+# Remove old version
+remove.packages("haf")
+
+# Install new version
+devtools::install_github("yourusername/haf")
 ```
 
 ## Building Documentation
