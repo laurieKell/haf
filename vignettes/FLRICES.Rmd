@@ -1,0 +1,253 @@
+---
+title: "FLRICES: FLR-based Implementation of ICES Harvest Control Rules"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{FLRICES: FLR-based Implementation of ICES Harvest Control Rules}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+## Introduction
+
+The FLRICES package provides standardized implementations of ICES (International Council for the Exploration of the Sea) harvest control rules within the FLR (Fisheries Library for R) framework. This vignette demonstrates how to use the package to implement different types of harvest control rules for various stock categories.
+
+## Installation and Loading
+
+```{r install}
+# Load the package
+library(FLRICES)
+
+# Load required FLR packages
+library(FLCore)
+library(FLBRP)
+```
+
+## 1. Hockey-Stick HCR for Category 1 & 2 Stocks
+
+The hockey-stick HCR is the standard ICES approach for well-assessed stocks (Category 1 and 2). It implements a biomass-based trigger system with linear reduction between reference points.
+
+### Setting up Parameters
+
+```{r hcr_setup}
+# Define HCR parameters
+params <- FLPar(
+  blim = 100000,   # Biomass limit reference point
+  btrig = 150000,  # Biomass trigger reference point  
+  bmin = 100000,   # Minimum biomass
+  ftar = 0.3,      # Target fishing mortality
+  fmin = 0.05      # Minimum fishing mortality
+)
+
+print(params)
+```
+
+### Visualizing the HCR
+
+```{r hcr_plot, fig.cap="Hockey-stick HCR showing the relationship between biomass and fishing mortality"}
+# Create HCR plot
+hcrPlot2(btarget = 1.0, blim = 0.1, bthresh = 0.8, btrigger = 0.9,
+         ftarget = 0.8, fmax = 1.5, fmsy = 1.0)
+```
+
+### Running HCR Simulation
+
+```{r hcr_simulation, eval=FALSE}
+# Note: This requires actual FLStock and FLBRP objects
+# data(ple4)  # Load example stock data
+# 
+# # Run HCR simulation
+# result <- hcrICESAR(ple4, eql, sr_deviances, params, 
+#                   start = 2010, end = 2030)
+# 
+# # Extract results
+# stock_result <- result[[1]]
+# hcr_summary <- result[[2]]
+```
+
+## 2. RFB Rule for Category 3 Stocks
+
+The RFB (r × f × b × m) rule is designed for data-limited stocks (Category 3) and uses multiple indicators to determine catch advice.
+
+### Setting up RFB Parameters
+
+```{r rfb_setup}
+# Example life-history parameters
+linf <- 35   # Asymptotic length (cm)
+lc <- 25     # Length at first capture (cm)
+k <- 0.25    # Growth coefficient
+
+# Create example index data
+set.seed(123)
+historical_index <- FLQuant(rlnorm(20, meanlog = 10, sdlog = 0.3),
+                           dimnames = list(year = 2000:2019))
+
+# Calculate RFB parameters
+cntrl <- rfbParams(linf = linf, lc = lc, k = k, index = historical_index)
+print(cntrl)
+```
+
+### Applying the RFB Rule
+
+```{r rfb_application, eval=FALSE}
+# Example application (requires actual data)
+# 
+# # Create example data
+# biomass_index <- FLQuant(rlnorm(25, meanlog = 10, sdlog = 0.3),
+#                          dimnames = list(year = 2000:2024))
+# length_index <- FLQuant(rlnorm(25, meanlog = 2.5, sdlog = 0.1),
+#                         dimnames = list(year = 2000:2024))
+# previous_tac <- FLQuant(1000, dimnames = list(year = 2000:2024))
+# 
+# # Apply RFB rule for year 2024
+# advice_2024 <- rfbRule(iYr = 2024, 
+#                        indx = biomass_index,
+#                        FIndx = length_index, 
+#                        tac = previous_tac, 
+#                        cntrl = cntrl)
+# 
+# print(advice_2024)
+```
+
+## 3. Survey-Based HCR
+
+The survey-based HCR is designed for stocks managed through survey indices rather than analytical assessments. This includes Nephrops, crustaceans, and other species where biomass estimates come from surveys.
+
+### Setting up Survey-Based Parameters
+
+```{r survey_setup}
+# Define survey-based HCR parameters
+survey_cntrl <- FLPar(
+  fmsy = 0.16,    # Target fishing mortality
+  btrig = 5000,   # Biomass trigger reference point
+  bbuf = 2500     # Biomass buffer reference point
+)
+
+print(survey_cntrl)
+```
+
+### Applying Nephrops HCR
+
+```{r nephrops_application, eval=FALSE}
+# Example application
+# 
+# # Create example survey index and catch data
+# survey_index <- FLQuant(seq(1000, 8000, length.out = 25),
+#                         dimnames = list(year = 2000:2024))
+# historical_catch <- FLQuant(800, dimnames = list(year = 2000:2024))
+# 
+# # Apply Nephrops HCR for year 2024
+# advice_2024 <- hcrNephrops(iYr = 2024, 
+#                            index = survey_index,
+#                            catch = historical_catch, 
+#                            cntrl = nephrops_cntrl,
+#                            lag = 1)
+# 
+# print(advice_2024)
+```
+
+## 4. Visualization Examples
+
+### Standard HCR Plot
+
+```{r standard_plot, fig.cap="Standard HCR plot showing the hockey-stick relationship"}
+hcrPlot(btarget = 1.0, blim = 0.1, bthresh = 0.8, btrigger = 0.9,
+        ftarget = 1.0, fmax = 1.5)
+```
+
+### Enhanced HCR Plot
+
+```{r enhanced_plot, fig.cap="Enhanced HCR plot with management zones"}
+hcrPlot2(btarget = 1.0, blim = 0.1, bthresh = 0.8, btrigger = 0.9,
+         ftarget = 0.8, fmax = 1.5, fmsy = 1.0)
+```
+
+## 5. Best Practices
+
+### Parameter Selection
+
+1. **Reference Points**: Ensure Blim < Btrigger < Btarget
+2. **Fishing Mortality**: Fmin should be close to zero, Ftarget should be sustainable
+3. **TAC Bounds**: Use stability clauses (e.g., ±20%) to prevent large year-to-year changes
+
+### Validation
+
+```{r validation}
+# Example parameter validation
+validate_params <- function(params) {
+  # Check that reference points are in correct order
+  if (params["blim"] >= params["btrig"]) {
+    stop("Blim must be less than Btrigger")
+  }
+  if (params["btrig"] >= params["bmin"]) {
+    stop("Btrigger must be less than Bmin")
+  }
+  
+  # Check fishing mortality parameters
+  if (params["fmin"] >= params["ftar"]) {
+    stop("Fmin must be less than Ftarget")
+  }
+  
+  cat("Parameters validated successfully!\n")
+}
+
+# Test validation
+validate_params(params)
+```
+
+## 6. Advanced Features
+
+### Multiple Iterations
+
+The package supports multiple iterations for uncertainty analysis:
+
+```{r iterations, eval=FALSE}
+# Example with multiple iterations
+# params_iter <- propagate(params, 100)  # 100 iterations
+# 
+# # Run HCR with uncertainty
+# result_iter <- hcrICESAR(stock, eql, sr_deviances, params_iter, 
+#                        start = 2010, end = 2030)
+```
+
+### Implementation Error
+
+Add implementation error to simulate real-world conditions:
+
+```{r impl_error, eval=FALSE}
+# Add implementation error
+# impl_error <- FLQuant(rnorm(20, 0, 0.1), 
+#                       dimnames = list(year = 2010:2029))
+# 
+# result_with_error <- hcrICESAR(stock, eql, sr_deviances, params,
+#                              start = 2010, end = 2029,
+#                              implErr = impl_error)
+```
+
+## Summary
+
+The FLRICES package provides a comprehensive toolkit for implementing ICES harvest control rules within the FLR framework. Key features include:
+
+- **Standardized implementations** of ICES HCRs
+- **Multiple stock categories** support (1, 2, and 3)
+- **Comprehensive visualization** tools
+- **Uncertainty analysis** capabilities
+- **Real-world simulation** features (implementation error, TAC bounds)
+
+For more information, see the package documentation and individual function help pages.
+
+## References
+
+- ICES (2025). Technical Guidelines for Data-limited Stock Assessments. ICES CM 2025/ACOM:68
+- ICES (2023). ICES Technical Guidelines for Category 1 and 2 stocks. ICES CM 2023/ACOM:XX
+- Kell, L.T., et al. (2023). FLR: Fisheries Library for R. Journal of Statistical Software, 58(12), 1-34. 

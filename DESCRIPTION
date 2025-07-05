@@ -1,0 +1,28 @@
+Package: FLRICES
+Type: Package
+Title: FLR-based Implementation of ICES Harvest Control Rules
+Version: 0.1.0
+Date: 2024-12-19
+Authors@R: 
+    person("Your", "Name", 
+           email = "your.email@example.com",
+           role = c("aut", "cre"))
+Description: A comprehensive R package implementing ICES (International Council for the Exploration of the Sea) harvest control rules within the FLR (Fisheries Library for R) framework. The package provides standardized implementations of various ICES advice rules including hockey-stick HCRs, RFB rules for data-limited stocks, and Nephrops-specific rules.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.2.3
+Depends: 
+    R (>= 4.0.0)
+Imports:
+    FLCore (>= 2.6.0),
+    FLBRP (>= 2.5.0),
+    ggplot2 (>= 3.4.0),
+    methods
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+URL: https://github.com/yourusername/FLRICES
+BugReports: https://github.com/yourusername/FLRICES/issues 
