@@ -56,10 +56,10 @@ setMethod("eql", signature(object="FLStock"),
             attributes(rtn)[["sr"]]     =sr
             attributes(rtn)[["logLik"]] =logLik(sr)
             attributes(rtn)[["prod"]]   =spFn(rtn)
-            attributes(rtn)[["tseries"]]=tseries(object)
+            attributes(rtn)[["tseries"]]=FLCandy:::tseries(object)
             attributes(rtn)[["eb.obs"]] =ebiomass(object)
-            attributes(rtn)[["priors"]] =tryIt(FLCandy:::calcPriors(rtn))
-            attributes(rtn)[["prior2"]] =tryIt(FLCandy:::getPriors(rtn))
+            attributes(rtn)[["priors"]] =FLCandy:::tryIt(FLCandy:::calcPriors(rtn))
+            attributes(rtn)[["prior2"]] =FLCandy:::tryIt(FLCandy:::getPriors(rtn))
             
             return(rtn)})
 

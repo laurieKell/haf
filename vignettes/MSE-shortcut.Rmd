@@ -83,14 +83,14 @@ The MSE method requires fitted stock-recruitment relationships. Let's fit both B
 
 ```{r srr_fitting}
 # Fit Beverton-Holt stock-recruitment relationship
-eqlBh=haf:::eql(ple4, model = "bevholtSV")
+eqlBh=eql(ple4, model = "bevholtSV")
 
 # Fit Ricker stock-recruitment relationship  
 eqlRk=eql(ple4, model = "rickerSV")
 
 # Compare model fits
-logLik_bh <- attributes(eql_bh)$logLik[1]
-logLik_rk <- attributes(eql_rk)$logLik[1]
+logLik_bh <- attributes(eqlBh)$logLik[1]
+logLik_rk <- attributes(eqlRk)$logLik[1]
 
 cat("Beverton-Holt log-likelihood:", logLik_bh, "\n")
 cat("Ricker log-likelihood:", logLik_rk, "\n")
@@ -98,11 +98,11 @@ cat("Best model:", ifelse(logLik_bh > logLik_rk, "Beverton-Holt", "Ricker"), "\n
 
 # Plot stock-recruitment relationships
 sr_plot <- ggplot() +
-  geom_point(data = as.data.frame(attributes(eql_bh)$rec.obs), 
+  geom_point(data = as.data.frame(attributes(eqlBh)$rec.obs), 
              aes(x = ssb, y = rec), alpha = 0.6) +
-  geom_line(data = as.data.frame(predict(attributes(eql_bh)$sr)), 
+  geom_line(data = as.data.frame(predict(attributes(eqlBh)$sr)), 
             aes(x = ssb, y = rec, color = "Beverton-Holt"), size = 1) +
-  geom_line(data = as.data.frame(predict(attributes(eql_rk)$sr)), 
+  geom_line(data = as.data.frame(predict(attributes(eqlRk)$sr)), 
             aes(x = ssb, y = rec, color = "Ricker"), size = 1) +
   labs(x = "Spawning Stock Biomass", y = "Recruitment", 
        title = "Stock-Recruitment Relationships",
@@ -118,7 +118,7 @@ Now let's run MSE using the Beverton-Holt model:
 
 ```{r single_stock_mse}
 # Run MSE with default parameters
-mse_result <- MSE(ple4, eql_bh, 
+mse_result <- shortcut(ple4, eqlBh, 
                   nits = 50,        # Reduced for vignette
                   endYear = 2030,   # Shorter projection period
                   seed = 123)
@@ -201,7 +201,7 @@ stocks <- FLStocks(
 
 # Create corresponding equilibrium objects
 eqls <- FLBRPs(
-  "Base" = eql_bh,
+  "Base" = eqlBh,
   "High_M" = eql(ple4_high, model = "bevholtSV"),
   "Low_M" = eql(ple4_low, model = "bevholtSV")
 )
@@ -296,7 +296,7 @@ custom_hcr <- FLPar(
 )
 
 # Run MSE with custom parameters
-mse_custom <- MSE(ple4, eql_bh, 
+mse_custom <- MSE(ple4, eqlBh, 
                   hcrParams = custom_hcr,
                   nits = 20,
                   endYear = 2030,
@@ -323,7 +323,7 @@ The MSE method uses parallel processing by default with `future.apply`. You can 
 
 ```{r parallel_config}
 # Run MSE with specific number of workers
-mse_parallel <- MSE(ple4, eql_bh, 
+mse_parallel <- MSE(ple4, eqlBh, 
                     workers = 2,    # Use only 2 workers
                     nits = 20,
                     endYear = 2030,

@@ -53,9 +53,9 @@ setGeneric("shortcut", function(object, eql, ...) standardGeneric("shortcut"))
 
 #' @rdname shortcut
 #' @export
-setMethod("shortcut", signature(object = "FLStock", eql = "FLBRP"),
-          function(object, eql, endYear = 2050, nits = 100, seed = 1233,
-                   hcrParams = NULL, bndTac = c(0.8, 1.25), workers = NULL, ...) {
+setMethod("shortcut", signature(object="FLStock", eql="FLBRP"),
+          function(object, eql, endYear=2050, nits=100, seed=1233,
+                   hcrParams=NULL, bndTac = c(0.8, 1.25), workers = NULL, ...) {
             
             # Set up parallel processing with future.apply
             if (is.null(workers)) {
@@ -80,7 +80,7 @@ setMethod("shortcut", signature(object = "FLStock", eql = "FLBRP"),
             }
             
             # Extract recruitment residuals
-            recResiduals <- attributes(eql)$rec.residuals
+            recResiduals <- attributes(attributes(eql)$sr)$residuals
             if (is.null(recResiduals)) {
               warning("Recruitment residuals not found in equilibrium object.")
               return(NULL)
@@ -119,7 +119,7 @@ setMethod("shortcut", signature(object = "FLStock", eql = "FLBRP"),
             
             # Run MSE simulation
             result <- tryCatch({
-              hcrICES(stk, eql, exp(recDevs), hcrParams,
+              hcrICESAR(stk, eql, sr_deviances=exp(recDevs), params=hcrParams,
                      start = dims(object)$maxyear, end = endYear,
                      interval = 1, lag = 1, err = obsError, bndTac = bndTac)
             }, error = function(e) {
@@ -182,7 +182,7 @@ setMethod("shortcut", signature(object = "FLStocks", eql = "FLBRPs"),
               
               # Generate observation errors
               obsError <- rlnorm(nits, 
-                                FLQuant(0, dimnames = list(year = 2019:endYear)), 
+                                FLQuant(0, dimnames = list(year=dims(stk)$maxyear:endYear)), 
                                 sqrt(var(recDevs)))
               
               # Set up HCR parameters if not provided

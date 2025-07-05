@@ -67,12 +67,12 @@ setMethod('hcrICESAR', signature(object="FLStock",eql='FLBRP'),
                    bndTac  =c(0,Inf),
                    bndWhen ="btrig",
                    bndCap  =1e6,...){
-            
+
             if ("perfect"%in%names(list(...)))
               perfect=list(...)$perfect
             else 
               perfect=FALSE
-            
+
             bias<-function(object,eql,err,iYr,lag=1){
               stock.n(object)[,ac(iYr)]=stock.n(object)[,ac(iYr)]%*%err[,ac(iYr)]
               
@@ -93,17 +93,17 @@ setMethod('hcrICESAR', signature(object="FLStock",eql='FLBRP'),
               
               #refpts(eql)[]=1
               #refpts(eql)=propagate(refpts(eql),dim(object)[6])
-            
-              if (!is.null(err))
-                mp=bias(object,eql,err,iYr,lag=hcrYrs-stkYrs-1)
-              else
-                mp=object
 
+              #if (!is.null(err))
+              #  mp=bias(object,eql,err,iYr,lag=hcrYrs-stkYrs-1)
+              #else
+                mp=object
+  
               if ("FLPar"%in%is(params)) {
                 par=params[,min(iYr-start+1,dims(params)$iter),drop=T]}
               else
                 par=params
-
+  
               res=hcrFn(mp,eql,par,
                         stkYrs,
                         refYrs,
