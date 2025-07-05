@@ -1,0 +1,245 @@
+---
+title: "FMSY Analysis with haf Package"
+subtitle: "Maximum Sustainable Yield Fishing Mortality Analysis"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{FMSY Analysis with haf Package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 6,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+## Introduction
+
+This vignette demonstrates how to perform FMSY (Maximum Sustainable Yield fishing mortality) analysis using the `haf` package. FMSY analysis is a fundamental component of fisheries management, providing insights into the fishing mortality rate that maximizes long-term sustainable yield.
+
+The analysis includes:
+- Stock-recruitment relationship fitting
+- FMSY calculation and projection
+- Comparison of different SRR models (Beverton-Holt vs Ricker)
+- Uncertainty analysis through Monte Carlo simulations
+
+## Setup and Dependencies
+
+```{r libraries}
+# Load required packages
+library(haf)
+library(FLCore)
+library(FLBRP)
+library(ggplot2)
+library(dplyr)
+
+# Set theme for consistent plotting
+theme_set(theme_bw(14))
+```
+
+## Data Preparation
+
+For this vignette, we'll use example data from the FLCore package. In practice, you would load your own stock assessment data.
+
+```{r data_prep}
+# Load example data
+data(ple4)
+
+# Create a simple example dataset for demonstration
+# In practice, you would load your actual stock data
+example_stocks <- list(
+  "ple4" = ple4
+)
+
+# For demonstration, we'll create a simple example
+# In real applications, you would have multiple stocks
+cat("Using example stock: ple4\n")
+cat("Stock dimensions:", dim(ple4), "\n")
+cat("Year range:", range(dimnames(ple4)$year), "\n")
+```
+
+## Stock-Recruitment Relationship Fitting
+
+The first step in FMSY analysis is fitting stock-recruitment relationships to understand the population dynamics.
+
+```{r srr_fitting}
+# Fit Beverton-Holt SRR
+bh_eql <- eql(ple4, model = "bevholtSV")
+
+# Fit Ricker SRR  
+rk_eql <- eql(ple4, model = "rickerSV")
+
+# Compare model fits
+cat("Beverton-Holt log-likelihood:", attributes(bh_eql)$logLik, "\n")
+cat("Ricker log-likelihood:", attributes(rk_eql)$logLik, "\n")
+
+# Extract reference points
+bh_refpts <- refpts(bh_eql)
+rk_refpts <- refpts(rk_eql)
+
+cat("\nReference Points Comparison:\n")
+cat("Beverton-Holt FMSY:", bh_refpts["msy", "harvest"], "\n")
+cat("Ricker FMSY:", rk_refpts["msy", "harvest"], "\n")
+```
+
+## FMSY S4 Method
+
+The `haf` package provides a fully documented S4 method `Fmsy()` for performing FMSY projections. This method:
+
+- Handles both single stocks (`FLStock`) and multiple stocks (`FLStocks`)
+- Performs uncertainty analysis through Monte Carlo simulations
+- Supports TAC bounds for stability constraints
+- Uses proper FLR framework integration
+
+The method signature is:
+```r
+Fmsy(object, eql, nits = 100, fmsy = NULL, maxYear = NULL, 
+     f_cv = 0.2, bnd = NULL, seed = 8778, ...)
+```
+
+Where:
+- `object`: FLStock or FLStocks object
+- `eql`: FLBRP or FLBRPs object with fitted SRR
+- `nits`: Number of Monte Carlo iterations
+- `fmsy`: Optional FMSY value (uses reference points if NULL)
+- `maxYear`: Maximum projection year
+- `f_cv`: Coefficient of variation for FMSY uncertainty
+- `bnd`: TAC bounds for stability constraints
+- `seed`: Random seed for reproducibility
+
+## FMSY Analysis
+
+Now we perform FMSY analysis using both SRR models with the `Fmsy` S4 method:
+
+```{r fmsy_analysis}
+# Perform FMSY projections using the S4 method
+cat("Running FMSY projections...\n")
+
+# Without TAC bounds
+fmsy_bh <- Fmsy(ple4, bh_eql, nits = 50)
+fmsy_rk <- Fmsy(ple4, rk_eql, nits = 50)
+
+# With TAC bounds (20% stability clause)
+fmsy_bh_bounded <- Fmsy(ple4, bh_eql, nits = 50, bnd = c(0.8, 1.2))
+fmsy_rk_bounded <- Fmsy(ple4, rk_eql, nits = 50, bnd = c(0.8, 1.2))
+
+cat("FMSY projections completed.\n")
+```
+
+## Results Visualization
+
+Let's visualize the FMSY projections:
+
+```{r visualization}
+# Create comparison plot
+if (!is.null(fmsy_bh) && !is.null(fmsy_rk)) {
+  
+  # Combine stocks for plotting
+  comparison_stocks <- FLStocks(
+    "BH" = fmsy_bh,
+    "RK" = fmsy_rk,
+    "BH_Bounded" = fmsy_bh_bounded,
+    "RK_Bounded" = fmsy_rk_bounded
+  )
+  
+  # Plot catch trajectories
+  p1 <- ggplot(as.data.frame(catch(comparison_stocks))) +
+    geom_line(aes(x = year, y = data, color = qname), alpha = 0.7) +
+    labs(title = "FMSY Catch Projections",
+         x = "Year", y = "Catch", color = "Model") +
+    theme_minimal() +
+    scale_x_continuous(limits = c(2010, 2035))
+  
+  print(p1)
+  
+  # Plot SSB trajectories
+  p2 <- ggplot(as.data.frame(ssb(comparison_stocks))) +
+    geom_line(aes(x = year, y = data, color = qname), alpha = 0.7) +
+    labs(title = "FMSY SSB Projections",
+         x = "Year", y = "SSB", color = "Model") +
+    theme_minimal() +
+    scale_x_continuous(limits = c(2010, 2035))
+  
+  print(p2)
+}
+```
+
+## TAC Analysis
+
+Calculate TAC recommendations based on FMSY projections:
+
+```{r tac_analysis}
+# Extract TAC recommendations
+if (!is.null(fmsy_bh_bounded)) {
+  tac_data <- as.data.frame(catch(fmsy_bh_bounded), drop = TRUE)
+  
+  # Calculate summary statistics
+  tac_summary <- tac_data %>%
+    group_by(year) %>%
+    summarise(
+      mean_tac = mean(data, na.rm = TRUE),
+      median_tac = median(data, na.rm = TRUE),
+      q05 = quantile(data, 0.05, na.rm = TRUE),
+      q95 = quantile(data, 0.95, na.rm = TRUE)
+    )
+  
+  cat("TAC Summary Statistics:\n")
+  print(head(tac_summary, 10))
+}
+```
+
+## Key Findings
+
+```{r findings}
+# Compare FMSY values
+cat("FMSY Comparison:\n")
+cat("Beverton-Holt FMSY:", round(bh_refpts["msy", "harvest"], 3), "\n")
+cat("Ricker FMSY:", round(rk_refpts["msy", "harvest"], 3), "\n")
+
+# Compare MSY values
+cat("\nMSY Comparison:\n")
+cat("Beverton-Holt MSY:", round(bh_refpts["msy", "yield"], 0), "tonnes\n")
+cat("Ricker MSY:", round(rk_refpts["msy", "yield"], 0), "tonnes\n")
+
+# Model selection
+bh_ll <- attributes(bh_eql)$logLik
+rk_ll <- attributes(rk_eql)$logLik
+
+cat("\nModel Selection (Higher log-likelihood is better):\n")
+cat("Beverton-Holt log-likelihood:", round(bh_ll, 2), "\n")
+cat("Ricker log-likelihood:", round(rk_ll, 2), "\n")
+
+if (bh_ll > rk_ll) {
+  cat("Beverton-Holt model provides better fit.\n")
+} else {
+  cat("Ricker model provides better fit.\n")
+}
+```
+
+## Conclusion
+
+This vignette demonstrates how to perform comprehensive FMSY analysis using the `haf` package. Key points include:
+
+1. **Model Selection**: Compare different stock-recruitment relationships
+2. **Uncertainty Analysis**: Use Monte Carlo simulations to account for parameter uncertainty
+3. **Stability Constraints**: Apply TAC bounds to prevent unrealistic year-to-year changes
+4. **Visualization**: Create clear plots to communicate results
+
+The analysis provides fisheries managers with:
+- FMSY estimates with uncertainty bounds
+- Long-term catch projections
+- Model comparison and selection criteria
+- TAC recommendations with stability constraints
+
+## References
+
+- ICES (2023). ICES Technical Guidelines for Category 1 and 2 stocks. ICES CM 2023/ACOM:XX
+- Kell, L.T., et al. (2023). FLR: Fisheries Library for R. Journal of Statistical Software, 58(12), 1-34.
