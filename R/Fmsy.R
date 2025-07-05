@@ -104,10 +104,16 @@ setMethod("Fmsy", signature(object = "FLStock", eql = "FLBRP"),
             fmsy_quant <- FLQuant(c(fmsy), dimnames = list(year = currentYear:maxYear))
             fmsy_quant <- rlnorm(nits, log(fmsy_quant), f_cv)
             
+            # Ensure proper dimensions for FMSY quant
+            fmsy_quant <- propagate(fmsy_quant, nits)
+            
+            # Ensure recruitment deviations have proper dimensions
+            rec_devs <- propagate(rec_devs, nits)
+            
             # Perform stock projection
             if (is.null(bnd)) {
               # Simple projection without TAC bounds
-              stk <- fwd(stk, f = fmsy_quant, sr = eql, deviances = exp(rec_devs))
+              stk <- fwd(stk, f = fmsy_quant, sr = eql, residuals = exp(rec_devs))
             } else {
               # Projection with TAC bounds for stability
               if (length(bnd) != 2 || bnd[1] >= bnd[2]) {
@@ -116,7 +122,7 @@ setMethod("Fmsy", signature(object = "FLStock", eql = "FLBRP"),
               
               for (iYr in ac(currentYear:maxYear)) {
                 # Project with FMSY
-                stk <- fwd(stk, f = fmsy_quant[, iYr], sr = eql, deviances = exp(rec_devs))
+                stk <- fwd(stk, f = fmsy_quant[, iYr], sr = eql, residuals = exp(rec_devs))
                 
                 # Apply TAC bounds
                 prev_catch <- catch(stk)[, ac(as.numeric(iYr) - 1)]
@@ -128,7 +134,7 @@ setMethod("Fmsy", signature(object = "FLStock", eql = "FLBRP"),
                 )
                 
                 # Re-project with bounded catch
-                stk <- fwd(stk, catch = bounded_catch, sr = eql, deviances = exp(rec_devs))
+                stk <- fwd(stk, catch = bounded_catch, sr = eql, residuals = exp(rec_devs))
               }
             }
             
