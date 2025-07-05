@@ -81,15 +81,9 @@ setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
               stop("Stock-recruitment relationship not found in equilibrium object.")
             }
             
-            # Calculate recruitment deviations
+            # Calculate recruitment deviations (following FmsyV1 exactly)
             recHat=predict(sr)
             recObs=attributes(eql)$rec.obs
-            
-            if (is.null(recObs)) {
-              stop("Recruitment observations not found in equilibrium object.")
-            }
-            
-            # Align recruitment data with predicted values
             recObs=recObs[, dimnames(recObs)$year %in% dimnames(recHat)$year]
             recDevs=recObs / recHat
             recDevs=recDevs - median(recDevs)
@@ -100,29 +94,20 @@ setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
               dimnames=list(year=currentYear:maxYear, iter=seq(nits))
             )
             
-            # Create FMSY with uncertainty
+            # Create FMSY with uncertainty (following FmsyV1 exactly)
             fmsy_quant=FLQuant(c(fmsy), dimnames=list(year=currentYear:maxYear))
             fmsy_quant=rlnorm(nits, log(fmsy_quant), fCV)
             
-            # Perform stock projection
+            # Perform stock projection (following FmsyV1 exactly)
             if (is.null(bnd)) {
               # Simple projection without TAC bounds
               stk=fwd(stk, f=fmsy_quant, sr=eql, deviances=exp(recDevs))
             } else {
               # Projection with TAC bounds for stability
-              if (length(bnd) != 2 || bnd[1] >= bnd[2]) {
-                stop("TAC bounds must be a vector of length 2 with lower < upper")
-              }
-              
               for (iYr in ac(currentYear:maxYear)) {
-                # Project with FMSY
                 stk=fwd(stk, f=fmsy_quant[, iYr], sr=eql, deviances=exp(recDevs))
-                
-                # Apply TAC bounds (simplified to match FmsyV1)
-                ctc=qmin(qmax(catch(stk)[, iYr], catch(stk)[, ac(as.numeric(iYr)-1)] * bnd[1]), 
-                        catch(stk)[, ac(as.numeric(iYr)-1)] * bnd[2])
-                
-                # Re-project with bounded catch
+                ctc=qmin(qmax(catch(stk)[, iYr], catch(stk)[, ac(an(iYr)-1)] * bnd[1]), 
+                        catch(stk)[, ac(an(iYr)-1)] * bnd[2])
                 stk=fwd(stk, catch=ctc, sr=eql, deviances=exp(recDevs))
               }
             }
@@ -207,3 +192,31 @@ FmsyV1<-function(stk,eql,nits=100,fmsy=benchmark(stk)["fmsy"],maxYear=dims(stk)$
       stk=fwd(stk,catch=ctc,sr=eql,deviances=exp(recDevs))}}
   
   stk}  
+
+# Test function to debug Fmsy issues
+testFmsy <- function(stk, eql, nits=50) {
+  cat("Testing Fmsy method...\n")
+  cat("Stock dimensions:", dim(stk), "\n")
+  cat("Stock years:", range(dimnames(stk)$year), "\n")
+  cat("FMSY value:", refpts(eql)["msy", "harvest"], "\n")
+  
+  # Try the working FmsyV1 function first
+  cat("Testing FmsyV1...\n")
+  result_v1 <- try(FmsyV1(stk, eql, nits=nits))
+  if (!inherits(result_v1, "try-error")) {
+    cat("FmsyV1 worked successfully!\n")
+  } else {
+    cat("FmsyV1 failed:", result_v1, "\n")
+  }
+  
+  # Try the new Fmsy method
+  cat("Testing Fmsy method...\n")
+  result_new <- try(Fmsy(stk, eql, nits=nits))
+  if (!inherits(result_new, "try-error")) {
+    cat("Fmsy method worked successfully!\n")
+  } else {
+    cat("Fmsy method failed:", result_new, "\n")
+  }
+  
+  return(list(v1=result_v1, new=result_new))
+}  
