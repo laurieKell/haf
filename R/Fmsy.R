@@ -62,7 +62,7 @@ setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
             
             # Get current year and extend stock to projection period
             currentYear=dims(object)$maxyear
-            stk=window(object, end=maxYear)
+            stk=fwdWindow(object, end=maxYear)
             
             # Extract FMSY from reference points if not provided
             if (is.null(fmsy)) {
@@ -104,19 +104,10 @@ setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
             ftar=FLQuant(c(fmsy), dimnames=list(year=currentYear:maxYear))
             ftar=rlnorm(nits, log(ftar), fCV)
             
-            # Ensure proper dimensions for FMSY quant
-            ftar=propagate(ftar, nits)
-            
-            # Ensure recruitment deviations have proper dimensions
-            recDevs=propagate(recDevs, nits)
-            
-            # Ensure both objects have the same year range
-            recDevs=recDevs[, dimnames(ftar)$year]
-            
             # Perform stock projection
             if (is.null(bnd)) {
               # Simple projection without TAC bounds
-              stk=fwd(stk, f=ftar, sr=eql, residuals=exp(recDevs))
+              stk=fwd(stk, f=ftar, sr=eql, deviances=exp(recDevs))
             } else {
               # Projection with TAC bounds for stability
               if (length(bnd) != 2 || bnd[1] >= bnd[2]) {
@@ -125,7 +116,7 @@ setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
               
               for (iYr in ac(currentYear:maxYear)) {
                 # Project with FMSY
-                stk=fwd(stk, f=ftar[, iYr], sr=eql, residuals=exp(recDevs))
+                stk=fwd(stk, f=ftar[, iYr], sr=eql, deviances=exp(recDevs))
                 
                 # Apply TAC bounds
                 prev_catch=catch(stk)[, ac(as.numeric(iYr) - 1)]
@@ -137,7 +128,7 @@ setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
                 )
                 
                 # Re-project with bounded catch
-                stk=fwd(stk, catch=bounded_catch, sr=eql, residuals=exp(recDevs))
+                stk=fwd(stk, catch=bounded_catch, sr=eql, deviances=exp(recDevs))
               }
             }
             
