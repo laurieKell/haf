@@ -203,7 +203,7 @@ rfbRule<-function(iYr,indx,FIndx,tac,cntrl,bnd=c(0.7,1.2),ncur=2,npast=3) {
 #' simulateRFB(id=1, endYear=2050, nits=100)
 #' }
 #' 
-#' @importFrom FLCore propagate fwdWindow fwd ebiomass
+#' @importFrom FLCore propagate fwdWindow fwd
 #' @import ggplot2
 simulateRFB <- function(id=1, endYear=2050, nits=100) {
 
