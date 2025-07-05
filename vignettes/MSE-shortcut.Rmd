@@ -1,0 +1,454 @@
+---
+title: "Management Strategy Evaluation (MSE) with the haf Package"
+subtitle: "A practical guide to using the MSE method for fisheries management"
+author: "haf package"
+date: "`r format(Sys.time(),'%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+mathjax: TRUE
+tags: [FLR, FLCore, MSE, fisheries management, harvest control rules]
+license: Creative Commons Attribution-ShareAlike 4.0 International Public License
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  error = FALSE,
+  cache = TRUE,
+  fig.width = 10,
+  fig.height = 6,
+  dev = "png",
+  comment = NA
+)
+
+# Load required packages
+library(FLCore)
+library(ggplotFL)
+library(FLBRP)
+library(FLasher)
+library(FLAssess)
+library(haf)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+library(doParallel)
+library(foreach)
+
+# Set theme for plots
+theme_set(theme_bw(14))
+```
+
+# Introduction
+
+Management Strategy Evaluation (MSE) is a framework for testing the performance of harvest control rules (HCRs) under various sources of uncertainty. The `haf` package provides a generic `MSE()` method that implements a "shortcut" MSE approach, which uses historical recruitment residuals and observation errors to simulate future scenarios.
+
+This vignette demonstrates how to use the `MSE()` method for both single stocks and multiple stocks, showing how to:
+
+1. Set up stock-recruitment relationships
+2. Configure MSE parameters
+3. Run MSE simulations
+4. Analyze and visualize results
+
+# Single Stock MSE Example
+
+## Data Preparation
+
+First, let's load some example data and prepare it for MSE analysis:
+
+```{r data_prep}
+# Load example stock data
+data(ple4)
+
+# Display basic stock information
+summary(ple4)
+
+# Plot the stock
+plot(ple4) + 
+  ggtitle("Plaice Stock Data") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Fitting Stock-Recruitment Relationships
+
+The MSE method requires fitted stock-recruitment relationships. Let's fit both Beverton-Holt and Ricker models:
+
+```{r srr_fitting}
+# Fit Beverton-Holt stock-recruitment relationship
+eql_bh <- eql(ple4, model = "bevholtSV")
+
+# Fit Ricker stock-recruitment relationship  
+eql_rk <- eql(ple4, model = "rickerSV")
+
+# Compare model fits
+logLik_bh <- attributes(eql_bh)$logLik[1]
+logLik_rk <- attributes(eql_rk)$logLik[1]
+
+cat("Beverton-Holt log-likelihood:", logLik_bh, "\n")
+cat("Ricker log-likelihood:", logLik_rk, "\n")
+cat("Best model:", ifelse(logLik_bh > logLik_rk, "Beverton-Holt", "Ricker"), "\n")
+
+# Plot stock-recruitment relationships
+sr_plot <- ggplot() +
+  geom_point(data = as.data.frame(attributes(eql_bh)$rec.obs), 
+             aes(x = ssb, y = rec), alpha = 0.6) +
+  geom_line(data = as.data.frame(predict(attributes(eql_bh)$sr)), 
+            aes(x = ssb, y = rec, color = "Beverton-Holt"), size = 1) +
+  geom_line(data = as.data.frame(predict(attributes(eql_rk)$sr)), 
+            aes(x = ssb, y = rec, color = "Ricker"), size = 1) +
+  labs(x = "Spawning Stock Biomass", y = "Recruitment", 
+       title = "Stock-Recruitment Relationships",
+       color = "Model") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+print(sr_plot)
+```
+
+## Running MSE for Single Stock
+
+Now let's run MSE using the Beverton-Holt model:
+
+```{r single_stock_mse}
+# Run MSE with default parameters
+mse_result <- MSE(ple4, eql_bh, 
+                  nits = 50,        # Reduced for vignette
+                  endYear = 2030,   # Shorter projection period
+                  seed = 123)
+
+# Check if MSE was successful
+if (!is.null(mse_result)) {
+  cat("MSE completed successfully!\n")
+  cat("Number of iterations:", dim(mse_result)[6], "\n")
+  cat("Projection years:", range(dimnames(mse_result)$year), "\n")
+} else {
+  cat("MSE failed - check if FMSY is available in benchmark\n")
+}
+```
+
+## Analyzing MSE Results
+
+Let's analyze the MSE results and create some visualizations:
+
+```{r analyze_results}
+if (!is.null(mse_result)) {
+  # Extract key metrics
+  ssb_mse <- ssb(mse_result)
+  catch_mse <- catch(mse_result)
+  fbar_mse <- fbar(mse_result)
+  
+  # Calculate summary statistics
+  ssb_summary <- apply(ssb_mse, c(1, 2), quantile, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+  catch_summary <- apply(catch_mse, c(1, 2), quantile, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+  
+  # Plot results
+  p1 <- plot(ssb_mse) + 
+    ggtitle("Spawning Stock Biomass") +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  p2 <- plot(catch_mse) + 
+    ggtitle("Catch") +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  p3 <- plot(fbar_mse) + 
+    ggtitle("Fishing Mortality") +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  # Combine plots
+  combined_plot <- p1 / p2 / p3
+  print(combined_plot)
+  
+  # Calculate performance metrics
+  final_ssb <- ssb_mse[, ac(2030)]
+  final_catch <- catch_mse[, ac(2030)]
+  
+  cat("Final year (2030) summary:\n")
+  cat("SSB median:", median(final_ssb), "thousand tonnes\n")
+  cat("SSB 90% CI:", quantile(final_ssb, c(0.05, 0.95)), "thousand tonnes\n")
+  cat("Catch median:", median(final_catch), "thousand tonnes\n")
+  cat("Catch 90% CI:", quantile(final_catch, c(0.05, 0.95)), "thousand tonnes\n")
+}
+```
+
+# Multiple Stocks MSE Example
+
+## Creating Multiple Stocks
+
+Let's create a simple example with multiple stocks by using the same stock with different parameters:
+
+```{r multiple_stocks}
+# Create multiple stocks with slight modifications
+ple4_high <- ple4
+ple4_low <- ple4
+
+# Modify natural mortality for different scenarios
+m(ple4_high) <- m(ple4_high) * 1.2  # Higher natural mortality
+m(ple4_low) <- m(ple4_low) * 0.8    # Lower natural mortality
+
+# Create FLStocks object
+stocks <- FLStocks(
+  "Base" = ple4,
+  "High_M" = ple4_high,
+  "Low_M" = ple4_low
+)
+
+# Create corresponding equilibrium objects
+eqls <- FLBRPs(
+  "Base" = eql_bh,
+  "High_M" = eql(ple4_high, model = "bevholtSV"),
+  "Low_M" = eql(ple4_low, model = "bevholtSV")
+)
+
+# Display stock information
+cat("Multiple stocks created:\n")
+for (i in names(stocks)) {
+  cat(i, ": SSB range =", range(ssb(stocks[[i]])), "thousand tonnes\n")
+}
+```
+
+## Running MSE for Multiple Stocks
+
+Now let's run MSE for all stocks simultaneously:
+
+```{r multiple_stocks_mse}
+# Run MSE for multiple stocks
+mse_multi <- MSE(stocks, eqls, 
+                 nits = 30,        # Reduced for vignette
+                 endYear = 2030,   # Shorter projection period
+                 seed = 456)
+
+# Check results
+if (length(mse_multi) > 0) {
+  cat("MSE completed for", length(mse_multi), "stocks\n")
+  
+  # Compare final year results
+  final_results <- data.frame(
+    Stock = names(mse_multi),
+    SSB_median = sapply(mse_multi, function(x) median(ssb(x)[, ac(2030)])),
+    SSB_cv = sapply(mse_multi, function(x) cv(ssb(x)[, ac(2030)])),
+    Catch_median = sapply(mse_multi, function(x) median(catch(x)[, ac(2030)])),
+    Catch_cv = sapply(mse_multi, function(x) cv(catch(x)[, ac(2030)]))
+  )
+  
+  print(final_results)
+} else {
+  cat("MSE failed for all stocks\n")
+}
+```
+
+## Visualizing Multiple Stock Results
+
+Let's create comparative visualizations:
+
+```{r multi_visualization}
+if (length(mse_multi) > 0) {
+  # Create FLStocks from MSE results for easy plotting
+  mse_stocks <- FLStocks(mse_multi)
+  
+  # Plot SSB comparison
+  ssb_plot <- plot(ssb(mse_stocks)) + 
+    ggtitle("Spawning Stock Biomass Comparison") +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  # Plot catch comparison
+  catch_plot <- plot(catch(mse_stocks)) + 
+    ggtitle("Catch Comparison") +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  # Combine plots
+  print(ssb_plot / catch_plot)
+  
+  # Create performance comparison table
+  performance_table <- data.frame(
+    Stock = names(mse_multi),
+    SSB_2030_median = round(sapply(mse_multi, function(x) median(ssb(x)[, ac(2030)])), 1),
+    SSB_2030_cv = round(sapply(mse_multi, function(x) cv(ssb(x)[, ac(2030)])), 3),
+    Catch_2030_median = round(sapply(mse_multi, function(x) median(catch(x)[, ac(2030)])), 1),
+    Catch_2030_cv = round(sapply(mse_multi, function(x) cv(catch(x)[, ac(2030)])), 3)
+  )
+  
+  cat("Performance comparison (final year 2030):\n")
+  print(performance_table)
+}
+```
+
+# Advanced MSE Configuration
+
+## Custom HCR Parameters
+
+You can specify custom harvest control rule parameters:
+
+```{r custom_hcr}
+# Define custom HCR parameters
+custom_hcr <- FLPar(
+  ftar = 0.3,      # Target fishing mortality
+  btrig = 200000,  # Biomass trigger (tonnes)
+  fmin = 0.01,     # Minimum fishing mortality
+  bmin = 50000,    # Minimum biomass
+  blim = 25000     # Limit biomass
+)
+
+# Run MSE with custom parameters
+mse_custom <- MSE(ple4, eql_bh, 
+                  hcrParams = custom_hcr,
+                  nits = 20,
+                  endYear = 2030,
+                  seed = 789)
+
+if (!is.null(mse_custom)) {
+  cat("Custom HCR MSE completed successfully!\n")
+  
+  # Compare with default HCR
+  if (!is.null(mse_result)) {
+    default_catch <- median(catch(mse_result)[, ac(2030)])
+    custom_catch <- median(catch(mse_custom)[, ac(2030)])
+    
+    cat("Default HCR median catch (2030):", round(default_catch, 1), "tonnes\n")
+    cat("Custom HCR median catch (2030):", round(custom_catch, 1), "tonnes\n")
+    cat("Difference:", round(custom_catch - default_catch, 1), "tonnes\n")
+  }
+}
+```
+
+## Parallel Processing Configuration
+
+The MSE method uses parallel processing by default. You can control the number of cores:
+
+```{r parallel_config}
+# Run MSE with specific number of cores
+mse_parallel <- MSE(ple4, eql_bh, 
+                    cores = 2,      # Use only 2 cores
+                    nits = 20,
+                    endYear = 2030,
+                    seed = 999)
+
+cat("MSE with 2 cores completed:", !is.null(mse_parallel), "\n")
+```
+
+# Performance Analysis
+
+## Risk Analysis
+
+Let's analyze the risk of stock depletion:
+
+```{r risk_analysis}
+if (!is.null(mse_result)) {
+  # Calculate risk metrics
+  ssb_mse <- ssb(mse_result)
+  
+  # Risk of SSB falling below 20% of current level
+  current_ssb <- median(ssb(ple4)[, ac(dims(ple4)$maxyear)])
+  threshold <- current_ssb * 0.2
+  
+  risk_by_year <- apply(ssb_mse, 2, function(x) mean(x < threshold))
+  
+  # Plot risk over time
+  risk_data <- data.frame(
+    Year = as.numeric(names(risk_by_year)),
+    Risk = risk_by_year
+  )
+  
+  risk_plot <- ggplot(risk_data, aes(x = Year, y = Risk)) +
+    geom_line(size = 1, color = "red") +
+    geom_hline(yintercept = 0.05, linetype = "dashed", color = "orange") +
+    labs(title = "Risk of SSB < 20% of Current Level",
+         x = "Year", y = "Probability") +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  print(risk_plot)
+  
+  cat("Risk analysis summary:\n")
+  cat("Final year risk:", round(risk_by_year[length(risk_by_year)], 3), "\n")
+  cat("Years with risk > 5%:", sum(risk_by_year > 0.05), "\n")
+}
+```
+
+## Stability Analysis
+
+Let's analyze the stability of catch recommendations:
+
+```{r stability_analysis}
+if (!is.null(mse_result)) {
+  catch_mse <- catch(mse_result)
+  
+  # Calculate catch stability (coefficient of variation)
+  catch_cv <- apply(catch_mse, 2, cv)
+  
+  # Plot catch stability
+  stability_data <- data.frame(
+    Year = as.numeric(names(catch_cv)),
+    CV = catch_cv
+  )
+  
+  stability_plot <- ggplot(stability_data, aes(x = Year, y = CV)) +
+    geom_line(size = 1, color = "blue") +
+    geom_hline(yintercept = 0.2, linetype = "dashed", color = "orange") +
+    labs(title = "Catch Stability (Coefficient of Variation)",
+         x = "Year", y = "CV") +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  print(stability_plot)
+  
+  cat("Stability analysis summary:\n")
+  cat("Average catch CV:", round(mean(catch_cv), 3), "\n")
+  cat("Years with CV > 20%:", sum(catch_cv > 0.2), "\n")
+}
+```
+
+# Summary
+
+This vignette has demonstrated how to use the `MSE()` method from the `haf` package for Management Strategy Evaluation. Key features include:
+
+## Key Features
+
+1. **Generic Design**: Works with both single stocks (`FLStock`) and multiple stocks (`FLStocks`)
+2. **Flexible Parameters**: Customizable HCR parameters, projection periods, and iteration counts
+3. **Parallel Processing**: Efficient computation using multiple CPU cores
+4. **Error Handling**: Robust error handling with informative warnings
+5. **Reproducibility**: Seed-based random number generation for reproducible results
+
+## Typical Workflow
+
+1. **Data Preparation**: Ensure stock data is properly formatted
+2. **SRR Fitting**: Fit stock-recruitment relationships using `eql()`
+3. **MSE Execution**: Run MSE with appropriate parameters
+4. **Results Analysis**: Analyze performance metrics and risks
+5. **Visualization**: Create plots and tables for communication
+
+## Best Practices
+
+- Use sufficient iterations (100+ recommended for production)
+- Test multiple stock-recruitment models
+- Analyze both central tendency and uncertainty
+- Consider risk metrics alongside performance metrics
+- Validate results against known benchmarks
+
+The `MSE()` method provides a powerful and flexible tool for fisheries management strategy evaluation, supporting evidence-based decision making in fisheries management.
+
+# Session Information
+
+```{r session_info}
+# Package versions
+cat("Package versions:\n")
+cat("FLCore:", as.character(packageVersion("FLCore")), "\n")
+cat("FLBRP:", as.character(packageVersion("FLBRP")), "\n")
+cat("FLasher:", as.character(packageVersion("FLasher")), "\n")
+cat("haf:", as.character(packageVersion("haf")), "\n")
+
+# R version
+cat("\nR version:", R.version.string, "\n")
+cat("Compiled:", date(), "\n")
+```
+
+# References
+
+1. Kell, L.T., et al. (2007). FLR: an open-source framework for the evaluation and development of management strategies. *ICES Journal of Marine Science*, 64(4), 640-646.
+
+2. Punt, A.E., et al. (2016). Management strategy evaluation: best practices. *Fish and Fisheries*, 17(2), 303-334.
+
+3. ICES (2021). ICES Technical Guidelines for Management Strategy Evaluations. *ICES Cooperative Research Report*, 358.

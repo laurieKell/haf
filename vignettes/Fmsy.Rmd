@@ -36,8 +36,9 @@ The analysis includes:
 ```{r libraries}
 library(FLCore)
 library(FLBRP)
-library(ggplot2)
 library(FLasher)
+
+library(ggplot2)
 library(FLCandy)
 library(haf)
 
@@ -134,108 +135,6 @@ fmsy_rk_bounded <- Fmsy(ple4, rk_eql, nits = 50, bnd = c(0.8, 1.2))
 cat("FMSY projections completed.\n")
 ```
 
-## Visualisation
-
-```{r visualisation}
-# Create comparison plot
-if (!is.null(fmsy_bh) && !is.null(fmsy_rk)) {
-  
-  # Combine stocks for plotting
-  comparison_stocks <- FLStocks(
-    "BH" = fmsy_bh,
-    "RK" = fmsy_rk,
-    "BH_Bounded" = fmsy_bh_bounded,
-    "RK_Bounded" = fmsy_rk_bounded
-  )
-  
-  # Plot catch trajectories
-  p1 <- ggplot(as.data.frame(catch(comparison_stocks))) +
-    geom_line(aes(x = year, y = data, color = qname), alpha = 0.7) +
-    labs(title = "$F_{MSY}$ Catch Projections",
-         x = "Year", y = "Catch", color = "Model") +
-    theme_minimal() +
-    scale_x_continuous(limits = c(2010, 2035))
-  
-  print(p1)
-  
-  # Plot SSB trajectories
-  p2 <- ggplot(as.data.frame(ssb(comparison_stocks))) +
-    geom_line(aes(x = year, y = data, color = qname), alpha = 0.7) +
-    labs(title = "$F_{MSY}$ SSB Projections",
-         x = "Year", y = "SSB", color = "Model") +
-    theme_minimal() +
-    scale_x_continuous(limits = c(2010, 2035))
-  
-  print(p2)
-}
-```
-
-## TAC Analysis
-
-Calculate TAC recommendations based on $F_{MSY}$ projections:
-
-```{r tac_analysis}
-# Extract TAC recommendations
-if (!is.null(fmsy_bh_bounded)) {
-  tac_data <- as.data.frame(catch(fmsy_bh_bounded), drop = TRUE)
-  
-  # Calculate summary statistics
-  tac_summary <- tac_data %>%
-    group_by(year) %>%
-    summarise(
-      mean_tac = mean(data, na.rm = TRUE),
-      median_tac = median(data, na.rm = TRUE),
-      q05 = quantile(data, 0.05, na.rm = TRUE),
-      q95 = quantile(data, 0.95, na.rm = TRUE)
-    )
-  
-  cat("TAC Summary Statistics:\n")
-  print(head(tac_summary, 10))
-}
-```
-
-## Key Findings
-
-```{r findings}
-# Compare FMSY values
-cat("FMSY Comparison:\n")
-cat("Beverton-Holt FMSY:", round(bh_refpts["msy", "harvest"], 3), "\n")
-cat("Ricker FMSY:", round(rk_refpts["msy", "harvest"], 3), "\n")
-
-# Compare MSY values
-cat("\nMSY Comparison:\n")
-cat("Beverton-Holt MSY:", round(bh_refpts["msy", "yield"], 0), "tonnes\n")
-cat("Ricker MSY:", round(rk_refpts["msy", "yield"], 0), "tonnes\n")
-
-# Model selection
-bh_ll <- attributes(bh_eql)$logLik
-rk_ll <- attributes(rk_eql)$logLik
-
-cat("\nModel Selection (Higher log-likelihood is better):\n")
-cat("Beverton-Holt log-likelihood:", round(bh_ll, 2), "\n")
-cat("Ricker log-likelihood:", round(rk_ll, 2), "\n")
-
-if (bh_ll > rk_ll) {
-  cat("Beverton-Holt model provides better fit.\n")
-} else {
-  cat("Ricker model provides better fit.\n")
-}
-```
-
-## Summary
-
-This vignette demonstrates how to perform comprehensive $F_{MSY}$ analysis using the `haf` package. Key points include:
-
-1. **Model Selection**: Compare different stock-recruitment relationships
-2. **Uncertainty Analysis**: Use Monte Carlo simulations to account for parameter uncertainty
-3. **Stability Constraints**: Apply TAC bounds to prevent unrealistic year-to-year changes
-4. **Visualization**: Create clear plots to communicate results
-
-The analysis provides fisheries managers with:
-- $F_{MSY}$ estimates with uncertainty bounds
-- Long-term catch projections
-- Model comparison and selection criteria
-- TAC recommendations with stability constraints
 
 ## References
 
