@@ -42,7 +42,7 @@ setMethod("eql", signature(object="FLStock"),
               
               rtn}
             
-            spr0=FLCandy:::spr0Yr(object)
+            spr0=spr0Yr(object)
             sr  =as.FLSR(object,model=model)
             sr  =FLCandy:::ftmb(sr,s.est    =T,
                                 s        =0.7, #fishlife(object)["s"],
@@ -59,6 +59,29 @@ setMethod("eql", signature(object="FLStock"),
             attributes(rtn)[["tseries"]]=tseries(object)
             attributes(rtn)[["eb.obs"]] =ebiomass(object)
             attributes(rtn)[["priors"]] =tryIt(calcPriors(rtn))
-            attributes(rtn)[["prior2"]] =tryIt(FLCandy:::getPriors(rtn))
+            attributes(rtn)[["prior2"]] =tryIt(getPriors(rtn))
             
             return(rtn)})
+
+#' Simple FLSR constructor
+#' @param object FLStock object
+#' @param model Model name
+#' @return FLSR object
+as.FLSR <- function(object, model = "bevholtSV") {
+  # Create a simple FLSR object structure
+  # This is a minimal implementation for the haf package
+  sr <- list(
+    model = model,
+    rec = rec(object),
+    ssb = ssb(object)
+  )
+  class(sr) <- "FLSR"
+  return(sr)
+}
+
+#' Simple spr0Yr function
+#' @param object FLStock object
+#' @return Numeric value
+spr0Yr <- function(object) {
+  FLCandy:::spr0Yr(object)
+  }
