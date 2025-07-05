@@ -73,7 +73,7 @@ setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
             object <- ensurePositive(object)
             
             # Check if FMSY is available
-            fmsy <- benchmark(object)["fmsy"]
+            fmsy <- benchmark(object, eql)["fmsy"]
             if (is.na(fmsy)) {
               warning("FMSY not available in benchmark. Returning NULL.")
               return(NULL)
@@ -106,11 +106,11 @@ setMethod("MSE", signature(object = "FLStock", eql = "FLBRP"),
             # Set up HCR parameters if not provided
             if (is.null(hcrParams)) {
               hcrParams <- FLPar(
-                ftar = c(benchmark(object)["fmsy"]),
-                btrig = c(benchmark(object)["btrigger"]),
+                ftar = c(benchmark(object, eql)["fmsy"]),
+                btrig = c(benchmark(object, eql)["btrigger"]),
                 fmin = 0.005,
                 bmin = 0,
-                blim = benchmark(object)["blim"]
+                blim = benchmark(object, eql)["blim"]
               )
             }
             
@@ -162,7 +162,7 @@ setMethod("MSE", signature(object = "FLStocks", eql = "FLBRPs"),
               stk <- ensurePositive(object[[id]])
               
               # Check if FMSY is available
-              fmsy <- benchmark(stk)["fmsy"]
+              fmsy <- benchmark(stk, eql[[id]])["fmsy"]
               if (is.na(fmsy)) return(NULL)
               
               # Extract recruitment residuals
@@ -188,11 +188,11 @@ setMethod("MSE", signature(object = "FLStocks", eql = "FLBRPs"),
               # Set up HCR parameters if not provided
               if (is.null(hcrParams)) {
                 hcrParams <- FLPar(
-                  ftar = c(benchmark(stk)["fmsy"]),
-                  btrig = c(benchmark(stk)["btrigger"]),
+                  ftar = c(benchmark(stk, eql[[id]])["fmsy"]),
+                  btrig = c(benchmark(stk, eql[[id]])["btrigger"]),
                   fmin = 0.005,
                   bmin = 0,
-                  blim = benchmark(stk)["blim"]
+                  blim = benchmark(stk, eql[[id]])["blim"]
                 )
               }
               
@@ -239,99 +239,21 @@ ensurePositive <- function(stk) {
   return(stk)
 }
 
-ncore=detectCores()-4  
-registerDoParallel(ncore)
-
-catch.n(   icesdata[[46]])[catch.n(   icesdata[[46]])<=0]=0.0001
-discards.n(icesdata[[46]])[discards.n(icesdata[[46]])<=0]=0.0001
-landings.n(icesdata[[46]])[landings.n(icesdata[[46]])<=0]=0.0001
-stock.n(   icesdata[[46]])[stock.n(   icesdata[[46]])<=0]=0.0001
-
-mseBH=foreach(id=stks[!stks[,1]%in%BH,".id"],#names(icesdata),
-                     .combine   =list,
-                     .maxcombine=length(icesdata),
-                     .packages  =c("FLCore","FLBRP","FLasher","FLCandy")
-                     ) %dopar% {
-    source("C:/flrpapers/erp/source/hcrICESV3.R")
-
-    endYear=2050
-    nits   =100
-    set.seed(1233)
-
-    shortCut=rlnorm(nits,FLQuant(0,dimnames=list(year=2019:endYear)),var(err[-1,1])^0.5)
-      
-    stk=icesdata[[id]]
-      
-    if (is.na(c(benchmark(stk)["fmsy"]))) return(NULL)
-     
-    yrs=attributes(bhs[[id]])$rec.residuals
-    yrs=yrs[,rev(dim(yrs)[2]-0:min(dim(yrs)[2]-1,20))]
-
-    recDevs=attributes(bhs[[id]])$rec.residuals
-    recDevs=recDevs[,rev(dim(yrs)[2]-0:min(dim(recDevs)[2]-1,20))]
-    recDevs=recDevs-median(recDevs)
-    recDevs=FLQuant(sample(c(recDevs),dim(recDevs)[2]*nits,TRUE),
-                      dimnames=list(year=dims(icesdata[[id]])$maxyear:endYear,iter=seq(nits)))
-
-      
-    hcrPar=FLPar(c(ftar =c(benchmark(stk)["fmsy"]),
-                   btrig=c(benchmark(stk)["btrigger"]),
-                   fmin =FLPar(fmin=0.005),
-                   bmin =FLPar(bmin=0),
-                   blim =benchmark(stk)["blim"]))
-      
-    stk=propagate(fwdWindow(stk,end=endYear+1),nits)
-    rtn=tryIt(hcrICES(stk,bhs[[id]],exp(recDevs),
-                hcrPar,
-                start=dims(icesdata[[id]])$maxyear,end=endYear,
-                interval=1,lag=1,
-                err=shortCut,
-                bndTac=c(0.8,1.25)))
-    
-    save(rtn,file=paste(file.path("../data/results",id),".BH.RData"))
-    
-    rtn}
-
-mseRK=foreach(id=stks[!stks[,1]%in%RK,".id"],#names(icesdata),
-                     .combine   =list,
-                     .maxcombine=length(icesdata),
-                     .packages  =c("FLCore","FLBRP","FLasher","FLCandy")
-                     ) %dopar% {
-      
-    source("C:/flrpapers/erp/source/hcrICESV3.R")
-    endYear=2050
-    nits   =100
-    set.seed(1233)
-
-    shortCut=rlnorm(nits,FLQuant(0,dimnames=list(year=2019:endYear)),var(err[-1,1])^0.5)
-      
-    stk=icesdata[[id]]
-      
-    if (is.na(c(benchmark(stk)["fmsy"]))) return(NULL)
-      
-    recDevs=attributes(rks[[id]])$rec.residuals
-    recDevs=recDevs[,rev(dim(yrs)[2]-0:min(dim(recDevs)[2]-1,20))]
-    recDevs=recDevs-median(recDevs)
-    recDevs=FLQuant(sample(c(recDevs),dim(recDevs)[2]*nits,TRUE),
-                      dimnames=list(year=dims(icesdata[[id]])$maxyear:endYear,iter=seq(nits)))
-          
-    hcrPar=FLPar(c(ftar =c(benchmark(stk)["fmsy"]),
-                   btrig=c(benchmark(stk)["btrigger"]),
-                   fmin =FLPar(fmin=0.005),
-                   bmin =FLPar(bmin=0),
-                   blim =benchmark(stk)["blim"]))
-      
-    stk=propagate(fwdWindow(stk,end=endYear+1),nits)
-    rtn=tryIt(hcrICES(stk,rks[[id]],exp(recDevs),
-                hcrPar,
-                start=dims(icesdata[[id]])$maxyear,end=endYear,
-                interval=1,lag=1,
-                err=shortCut,
-                bndTac=c(0.8,1.25)))
-    
-    save(rtn,file=paste(file.path("../data/results",id),".RK.RData"))
-    
-    rtn}
-
-stopImplicitCluster()
+#' Benchmark function to extract reference points
+#' @param stk FLStock object
+#' @param eql FLBRP object
+#' @return Named vector with benchmark values
+benchmark <- function(stk, eql) {
+  # Extract reference points from equilibrium object
+  refs <- refpts(eql)
+  
+  # Create benchmark vector with common reference points
+  bench <- c(
+    fmsy = refs["msy", "harvest", drop = TRUE],
+    btrigger = refs["msy", "ssb", drop = TRUE] * 0.8,  # Common default
+    blim = refs["msy", "ssb", drop = TRUE] * 0.5       # Common default
+  )
+  
+  return(bench)
+}
 
