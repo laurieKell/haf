@@ -136,70 +136,7 @@ fmsyRK2=FLStocks(fmsyBH[!laply(fmsyRK2,is.null)])
 future::plan(sequential)
 ```
 
-```{r}
-library(future.apply)
-
-future::plan(multisession,workers=16)
-
-Fmsy<-function(stk,eql,nits=100,fmsy=benchmark(stk)["fmsy"],maxYear=dims(stk)$maxyear+25,f.cv=0.2,bnd=NA){
-        set.seed(8778)
-  
-        currentYear=dims(stk)$maxyear
-        stk    =fwdWindow(stk,end=maxYear)
-          
-        if (is.na(fmsy)) return(NULL)
-        
-        recHat =predict(attributes(eql)$sr)
-        recObs =attributes(eql)$rec.obs
-        recObs =recObs[,dimnames(recObs)$year%in%dimnames(recHat)$year]
-        recDevs=recObs%/%recHat  
-        recDevs=recDevs-median(recDevs)
-        
-        recDevs=FLQuant(sample(c(recDevs),dim(recDevs)[2]*nits,TRUE),
-                        dimnames=list(year=currentYear:maxYear,iter=seq(nits)))
-
-        fmsy   =FLQuant(c(fmsy),dimnames=list(year=currentYear:maxYear))
-        fmsy   =rlnorm(nits,log(fmsy),f.cv)
-
-        if (any(is.na(bnd)))
-          stk=fwd(stk,f=fmsy,sr=eql,deviances=exp(recDevs))
-        else{
-          for (iYr in ac((currentYear):maxYear)){
-            stk=fwd(stk,f=fmsy[,iYr],sr=eql,deviances=exp(recDevs))
-            ctc=qmin(qmax(catch(stk)[,iYr],catch(stk)[,ac(an(iYr)-1)]*bnd[1]),catch(stk)[,ac(an(iYr)-1)]*bnd[2])
-            stk=fwd(stk,catch=ctc,sr=eql,deviances=exp(recDevs))}}
-          
-        stk}   
-
-fmsyBH=setNames(future_lapply(names(icesdata), 
-                        function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]]))),
-    names(icesdata))
-fmsyBH=FLStocks(fmsyBH[!laply(fmsyBH,is.null)])
-
-fmsyRK=setNames(future_lapply(names(icesdata), 
-                        function(.id) tryIt(Fmsy(icesdata[[.id]], rks[[.id]]))),
-    names(icesdata))
-fmsyRK=FLStocks(fmsyBH[!laply(fmsyRK,is.null)])
-
-fmsyBH2=setNames(future_lapply(names(icesdata), 
-                         function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]],
-                 fmsy = refpts(bhs[[.id]])["msy", "harvest", drop = TRUE]))),
-    names(icesdata))
-fmsyBH2=FLStocks(fmsyBH[!laply(fmsyBH2,is.null)])
-
-fmsyRK2=setNames(future_lapply(names(icesdata), 
-                         function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]],
-                 fmsy = refpts(bhs[[.id]])["msy", "harvest", drop = TRUE]))),
-    names(icesdata))
-fmsyRK2=FLStocks(fmsyBH[!laply(fmsyRK2,is.null)])
-
-future::plan(sequential)
-
-```
-
-## Results Visualization
-
-Let's visualize the $F_{MSY}$ projections:
+## Visualisation
 
 ```{r visualization}
 # Create comparison plot
@@ -239,7 +176,7 @@ if (!is.null(fmsy_bh) && !is.null(fmsy_rk)) {
 
 Calculate TAC recommendations based on $F_{MSY}$ projections:
 
-```{r tac_analysis}
+```{r tac_analysis, eval=FALSE}
 # Extract TAC recommendations
 if (!is.null(fmsy_bh_bounded)) {
   tac_data <- as.data.frame(catch(fmsy_bh_bounded), drop = TRUE)
@@ -259,35 +196,7 @@ if (!is.null(fmsy_bh_bounded)) {
 }
 ```
 
-## Key Findings
-
-```{r findings}
-# Compare $F_{MSY}$ values
-cat("$F_{MSY}$ Comparison:\n")
-cat("Beverton-Holt $F_{MSY}$:", round(bh_refpts["msy", "harvest"], 3), "\n")
-cat("Ricker $F_{MSY}$:", round(rk_refpts["msy", "harvest"], 3), "\n")
-
-# Compare MSY values
-cat("\nMSY Comparison:\n")
-cat("Beverton-Holt MSY:", round(bh_refpts["msy", "yield"], 0), "tonnes\n")
-cat("Ricker MSY:", round(rk_refpts["msy", "yield"], 0), "tonnes\n")
-
-# Model selection
-bh_ll <- attributes(bh_eql)$logLik
-rk_ll <- attributes(rk_eql)$logLik
-
-cat("\nModel Selection (Higher log-likelihood is better):\n")
-cat("Beverton-Holt log-likelihood:", round(bh_ll, 2), "\n")
-cat("Ricker log-likelihood:", round(rk_ll, 2), "\n")
-
-if (bh_ll > rk_ll) {
-  cat("Beverton-Holt model provides better fit.\n")
-} else {
-  cat("Ricker model provides better fit.\n")
-}
-```
-
-## Conclusion
+## Summary
 
 This vignette demonstrates how to perform comprehensive $F_{MSY}$ analysis using the `haf` package. Key points include:
 
