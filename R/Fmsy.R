@@ -101,13 +101,13 @@ setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
             )
             
             # Create FMSY with uncertainty
-            ftar=FLQuant(c(fmsy), dimnames=list(year=currentYear:maxYear))
-            ftar=rlnorm(nits, log(ftar), fCV)
+            fmsy_quant=FLQuant(c(fmsy), dimnames=list(year=currentYear:maxYear))
+            fmsy_quant=rlnorm(nits, log(fmsy_quant), fCV)
             
             # Perform stock projection
             if (is.null(bnd)) {
               # Simple projection without TAC bounds
-              stk=fwd(stk, f=ftar, sr=eql, deviances=exp(recDevs))
+              stk=fwd(stk, f=fmsy_quant, sr=eql, deviances=exp(recDevs))
             } else {
               # Projection with TAC bounds for stability
               if (length(bnd) != 2 || bnd[1] >= bnd[2]) {
@@ -116,19 +116,14 @@ setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
               
               for (iYr in ac(currentYear:maxYear)) {
                 # Project with FMSY
-                stk=fwd(stk, f=ftar[, iYr], sr=eql, deviances=exp(recDevs))
+                stk=fwd(stk, f=fmsy_quant[, iYr], sr=eql, deviances=exp(recDevs))
                 
-                # Apply TAC bounds
-                prev_catch=catch(stk)[, ac(as.numeric(iYr) - 1)]
-                current_catch=catch(stk)[, iYr]
-                
-                bounded_catch=qmin(
-                  qmax(current_catch, prev_catch * bnd[1]), 
-                  prev_catch * bnd[2]
-                )
+                # Apply TAC bounds (simplified to match FmsyV1)
+                ctc=qmin(qmax(catch(stk)[, iYr], catch(stk)[, ac(as.numeric(iYr)-1)] * bnd[1]), 
+                        catch(stk)[, ac(as.numeric(iYr)-1)] * bnd[2])
                 
                 # Re-project with bounded catch
-                stk=fwd(stk, catch=bounded_catch, sr=eql, deviances=exp(recDevs))
+                stk=fwd(stk, catch=ctc, sr=eql, deviances=exp(recDevs))
               }
             }
             
