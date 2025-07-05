@@ -53,7 +53,6 @@
 #' }
 #' 
 #' @export
-#' @importFrom FLCore ebiomass
 hcrSurvey<-function(iYr,index,catch,cntrl,minCatch = 0.1,lag=1){
   
   # Error checking
