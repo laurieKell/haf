@@ -1,11 +1,11 @@
 ---
-title: "FMSY Analysis with haf Package"
-subtitle: "Maximum Sustainable Yield Fishing Mortality Analysis"
-author: "Your Name"
+title: "$F_{MSY}$ Analysis within `haf` Package"
+subtitle: "Stock projections at $F_{MSY}$"
+author: "Laurence T. Kell"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{FMSY Analysis with haf Package}
+  %\VignetteIndexEntry{$F_{MSY}$ Analysis with haf Package}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -23,25 +23,26 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-This vignette demonstrates how to perform FMSY (Maximum Sustainable Yield fishing mortality) analysis using the `haf` package. FMSY analysis is a fundamental component of fisheries management, providing insights into the fishing mortality rate that maximizes long-term sustainable yield.
+This vignette demonstrates how to perform $F_{MSY}$ (Maximum Sustainable Yield fishing mortality) analysis using the `haf` package. $F_{MSY}$ analysis is a fundamental component of fisheries management, providing insights into the fishing mortality rate that maximizes long-term sustainable yield.
 
 The analysis includes:
 - Stock-recruitment relationship fitting
-- FMSY calculation and projection
+- $F_{MSY}$ calculation and projection
 - Comparison of different SRR models (Beverton-Holt vs Ricker)
 - Uncertainty analysis through Monte Carlo simulations
 
 ## Setup and Dependencies
 
 ```{r libraries}
-# Load required packages
-library(haf)
 library(FLCore)
 library(FLBRP)
 library(ggplot2)
+library(FLCandy)
+library(haf)
+
+library(plyr)
 library(dplyr)
 
-# Set theme for consistent plotting
 theme_set(theme_bw(14))
 ```
 
@@ -49,50 +50,37 @@ theme_set(theme_bw(14))
 
 For this vignette, we'll use example data from the FLCore package. In practice, you would load your own stock assessment data.
 
-```{r data_prep}
-# Load example data
-data(ple4)
-
-# Create a simple example dataset for demonstration
-# In practice, you would load your actual stock data
-example_stocks <- list(
-  "ple4" = ple4
-)
-
-# For demonstration, we'll create a simple example
-# In real applications, you would have multiple stocks
-cat("Using example stock: ple4\n")
-cat("Stock dimensions:", dim(ple4), "\n")
-cat("Year range:", range(dimnames(ple4)$year), "\n")
+```{r,data}
+load("C:/active/icesdata/data/icesdata.RData")
+load("C:/active/icesdata/data/spp.RData")
+load("C:/active/icesdata/data/info.RData")
 ```
 
-## Stock-Recruitment Relationship Fitting
+## Stock-Recruitment Relationships
 
-The first step in FMSY analysis is fitting stock-recruitment relationships to understand the population dynamics.
+The first step in $F_{MSY}$ analysis is fitting stock-recruitment relationships to understand the population dynamics.
 
-```{r srr_fitting}
-# Fit Beverton-Holt SRR
-bh_eql <- eql(ple4, model = "bevholtSV")
+```{r FLBRPs}
+library(future.apply)
 
-# Fit Ricker SRR  
-rk_eql <- eql(ple4, model = "rickerSV")
+future::plan(multisession,workers=16)
 
-# Compare model fits
-cat("Beverton-Holt log-likelihood:", attributes(bh_eql)$logLik, "\n")
-cat("Ricker log-likelihood:", attributes(rk_eql)$logLik, "\n")
+bhs=setNames(future_lapply(names(icesdata), 
+                        function(.id) tryIt(haf:::eql(icesdata[[.id]],model="bevholtSV"))),
+    names(icesdata))
+bhs=FLBRPs(bhs)
 
-# Extract reference points
-bh_refpts <- refpts(bh_eql)
-rk_refpts <- refpts(rk_eql)
+rks=setNames(future_lapply(names(icesdata), 
+                        function(.id) tryIt(haf:::eql(icesdata[[.id]],model="rickerSV"))),
+    names(icesdata))
+rks=FLBRPs(rks[!laply(rks,is.null)])
 
-cat("\nReference Points Comparison:\n")
-cat("Beverton-Holt FMSY:", bh_refpts["msy", "harvest"], "\n")
-cat("Ricker FMSY:", rk_refpts["msy", "harvest"], "\n")
+future::plan(sequential)
 ```
 
-## FMSY S4 Method
+## $F_{MSY}$ S4 Method
 
-The `haf` package provides a fully documented S4 method `Fmsy()` for performing FMSY projections. This method:
+The `haf` package provides an S4 method `Fmsy()` for performing $F_{MSY}$ projections. This method:
 
 - Handles both single stocks (`FLStock`) and multiple stocks (`FLStocks`)
 - Performs uncertainty analysis through Monte Carlo simulations
@@ -100,43 +88,118 @@ The `haf` package provides a fully documented S4 method `Fmsy()` for performing 
 - Uses proper FLR framework integration
 
 The method signature is:
-```r
-Fmsy(object, eql, nits = 100, fmsy = NULL, maxYear = NULL, 
-     f_cv = 0.2, bnd = NULL, seed = 8778, ...)
+```{r
+Fmsy(object,eql,nits=100,f_cv=0.2,fmsy=NULL,maxYear=NULL,bnd=NULL,seed=8778,...)
 ```
 
 Where:
 - `object`: FLStock or FLStocks object
 - `eql`: FLBRP or FLBRPs object with fitted SRR
 - `nits`: Number of Monte Carlo iterations
-- `fmsy`: Optional FMSY value (uses reference points if NULL)
+- `fmsy`: Optional $F_{MSY}$ value (uses reference points if NULL)
 - `maxYear`: Maximum projection year
-- `f_cv`: Coefficient of variation for FMSY uncertainty
+- `f_cv`: Coefficient of variation for $F_{MSY}$ uncertainty
 - `bnd`: TAC bounds for stability constraints
 - `seed`: Random seed for reproducibility
 
-## FMSY Analysis
+## $F_{MSY}$ Analysis
 
-Now we perform FMSY analysis using both SRR models with the `Fmsy` S4 method:
+Run projections at $F_{MSY}$ for both SRR models using the `Fmsy` S4 method
 
-```{r fmsy_analysis}
-# Perform FMSY projections using the S4 method
-cat("Running FMSY projections...\n")
+```{r fmsy}
+library(future.apply)
 
-# Without TAC bounds
-fmsy_bh <- Fmsy(ple4, bh_eql, nits = 50)
-fmsy_rk <- Fmsy(ple4, rk_eql, nits = 50)
+future::plan(multisession,workers=16)
 
-# With TAC bounds (20% stability clause)
-fmsy_bh_bounded <- Fmsy(ple4, bh_eql, nits = 50, bnd = c(0.8, 1.2))
-fmsy_rk_bounded <- Fmsy(ple4, rk_eql, nits = 50, bnd = c(0.8, 1.2))
+fmsyBH=setNames(future_lapply(names(icesdata), 
+                        function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]]))),
+    names(icesdata))
+fmsyBH=FLStocks(fmsyBH[!laply(fmsyBH,is.null)])
 
-cat("FMSY projections completed.\n")
+fmsyRK=setNames(future_lapply(names(icesdata), 
+                        function(.id) tryIt(Fmsy(icesdata[[.id]], rks[[.id]]))),
+    names(icesdata))
+fmsyRK=FLStocks(fmsyBH[!laply(fmsyRK,is.null)])
+
+fmsyBH2=setNames(future_lapply(names(icesdata), 
+                         function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]],
+                 fmsy = refpts(bhs[[.id]])["msy", "harvest", drop = TRUE]))),
+    names(icesdata))
+fmsyBH2=FLStocks(fmsyBH[!laply(fmsyBH2,is.null)])
+
+fmsyRK2=setNames(future_lapply(names(icesdata), 
+                         function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]],
+                 fmsy = refpts(bhs[[.id]])["msy", "harvest", drop = TRUE]))),
+    names(icesdata))
+fmsyRK2=FLStocks(fmsyBH[!laply(fmsyRK2,is.null)])
+
+future::plan(sequential)
+```
+
+```{r}
+library(future.apply)
+
+future::plan(multisession,workers=16)
+
+Fmsy<-function(stk,eql,nits=100,fmsy=benchmark(stk)["fmsy"],maxYear=dims(stk)$maxyear+25,f.cv=0.2,bnd=NA){
+        set.seed(8778)
+  
+        currentYear=dims(stk)$maxyear
+        stk    =fwdWindow(stk,end=maxYear)
+          
+        if (is.na(fmsy)) return(NULL)
+        
+        recHat =predict(attributes(eql)$sr)
+        recObs =attributes(eql)$rec.obs
+        recObs =recObs[,dimnames(recObs)$year%in%dimnames(recHat)$year]
+        recDevs=recObs%/%recHat  
+        recDevs=recDevs-median(recDevs)
+        
+        recDevs=FLQuant(sample(c(recDevs),dim(recDevs)[2]*nits,TRUE),
+                        dimnames=list(year=currentYear:maxYear,iter=seq(nits)))
+
+        fmsy   =FLQuant(c(fmsy),dimnames=list(year=currentYear:maxYear))
+        fmsy   =rlnorm(nits,log(fmsy),f.cv)
+
+        if (any(is.na(bnd)))
+          stk=fwd(stk,f=fmsy,sr=eql,deviances=exp(recDevs))
+        else{
+          for (iYr in ac((currentYear):maxYear)){
+            stk=fwd(stk,f=fmsy[,iYr],sr=eql,deviances=exp(recDevs))
+            ctc=qmin(qmax(catch(stk)[,iYr],catch(stk)[,ac(an(iYr)-1)]*bnd[1]),catch(stk)[,ac(an(iYr)-1)]*bnd[2])
+            stk=fwd(stk,catch=ctc,sr=eql,deviances=exp(recDevs))}}
+          
+        stk}   
+
+fmsyBH=setNames(future_lapply(names(icesdata), 
+                        function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]]))),
+    names(icesdata))
+fmsyBH=FLStocks(fmsyBH[!laply(fmsyBH,is.null)])
+
+fmsyRK=setNames(future_lapply(names(icesdata), 
+                        function(.id) tryIt(Fmsy(icesdata[[.id]], rks[[.id]]))),
+    names(icesdata))
+fmsyRK=FLStocks(fmsyBH[!laply(fmsyRK,is.null)])
+
+fmsyBH2=setNames(future_lapply(names(icesdata), 
+                         function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]],
+                 fmsy = refpts(bhs[[.id]])["msy", "harvest", drop = TRUE]))),
+    names(icesdata))
+fmsyBH2=FLStocks(fmsyBH[!laply(fmsyBH2,is.null)])
+
+fmsyRK2=setNames(future_lapply(names(icesdata), 
+                         function(.id) tryIt(Fmsy(icesdata[[.id]], bhs[[.id]],
+                 fmsy = refpts(bhs[[.id]])["msy", "harvest", drop = TRUE]))),
+    names(icesdata))
+fmsyRK2=FLStocks(fmsyBH[!laply(fmsyRK2,is.null)])
+
+future::plan(sequential)
+
 ```
 
 ## Results Visualization
 
-Let's visualize the FMSY projections:
+Let's visualize the $F_{MSY}$ projections:
 
 ```{r visualization}
 # Create comparison plot
@@ -153,7 +216,7 @@ if (!is.null(fmsy_bh) && !is.null(fmsy_rk)) {
   # Plot catch trajectories
   p1 <- ggplot(as.data.frame(catch(comparison_stocks))) +
     geom_line(aes(x = year, y = data, color = qname), alpha = 0.7) +
-    labs(title = "FMSY Catch Projections",
+    labs(title = "$F_{MSY}$ Catch Projections",
          x = "Year", y = "Catch", color = "Model") +
     theme_minimal() +
     scale_x_continuous(limits = c(2010, 2035))
@@ -163,7 +226,7 @@ if (!is.null(fmsy_bh) && !is.null(fmsy_rk)) {
   # Plot SSB trajectories
   p2 <- ggplot(as.data.frame(ssb(comparison_stocks))) +
     geom_line(aes(x = year, y = data, color = qname), alpha = 0.7) +
-    labs(title = "FMSY SSB Projections",
+    labs(title = "$F_{MSY}$ SSB Projections",
          x = "Year", y = "SSB", color = "Model") +
     theme_minimal() +
     scale_x_continuous(limits = c(2010, 2035))
@@ -174,7 +237,7 @@ if (!is.null(fmsy_bh) && !is.null(fmsy_rk)) {
 
 ## TAC Analysis
 
-Calculate TAC recommendations based on FMSY projections:
+Calculate TAC recommendations based on $F_{MSY}$ projections:
 
 ```{r tac_analysis}
 # Extract TAC recommendations
@@ -199,10 +262,10 @@ if (!is.null(fmsy_bh_bounded)) {
 ## Key Findings
 
 ```{r findings}
-# Compare FMSY values
-cat("FMSY Comparison:\n")
-cat("Beverton-Holt FMSY:", round(bh_refpts["msy", "harvest"], 3), "\n")
-cat("Ricker FMSY:", round(rk_refpts["msy", "harvest"], 3), "\n")
+# Compare $F_{MSY}$ values
+cat("$F_{MSY}$ Comparison:\n")
+cat("Beverton-Holt $F_{MSY}$:", round(bh_refpts["msy", "harvest"], 3), "\n")
+cat("Ricker $F_{MSY}$:", round(rk_refpts["msy", "harvest"], 3), "\n")
 
 # Compare MSY values
 cat("\nMSY Comparison:\n")
@@ -226,7 +289,7 @@ if (bh_ll > rk_ll) {
 
 ## Conclusion
 
-This vignette demonstrates how to perform comprehensive FMSY analysis using the `haf` package. Key points include:
+This vignette demonstrates how to perform comprehensive $F_{MSY}$ analysis using the `haf` package. Key points include:
 
 1. **Model Selection**: Compare different stock-recruitment relationships
 2. **Uncertainty Analysis**: Use Monte Carlo simulations to account for parameter uncertainty
@@ -234,7 +297,7 @@ This vignette demonstrates how to perform comprehensive FMSY analysis using the 
 4. **Visualization**: Create clear plots to communicate results
 
 The analysis provides fisheries managers with:
-- FMSY estimates with uncertainty bounds
+- $F_{MSY}$ estimates with uncertainty bounds
 - Long-term catch projections
 - Model comparison and selection criteria
 - TAC recommendations with stability constraints
