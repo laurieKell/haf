@@ -10,7 +10,7 @@
 #' @param nits Number of iterations for uncertainty analysis (default: 100)
 #' @param fmsy FMSY value (if NULL, uses reference points from eql)
 #' @param maxYear Maximum projection year (default: current year + 25)
-#' @param f_cv Coefficient of variation for FMSY uncertainty (default: 0.2)
+#' @param fCV Coefficient of variation for FMSY uncertainty (default: 0.2)
 #' @param bnd TAC bounds c(lower, upper) for stability constraints (default: NULL)
 #' @param seed Random seed for reproducibility (default: 8778)
 #' @param ... Additional arguments
@@ -35,16 +35,16 @@
 #' data(ple4)
 #' 
 #' # Fit stock-recruitment relationship
-#' eql <- eql(ple4, model = "bevholtSV")
+#' eql=eql(ple4, model="bevholtSV")
 #' 
 #' # Simple FMSY projection
-#' fmsy_proj <- Fmsy(ple4, eql, nits = 50)
+#' fmsy_proj=Fmsy(ple4, eql, nits=50)
 #' 
 #' # FMSY projection with TAC bounds (20% stability clause)
-#' fmsy_bounded <- Fmsy(ple4, eql, nits = 50, bnd = c(0.8, 1.2))
+#' fmsy_bounded=Fmsy(ple4, eql, nits=50, bnd=c(0.8, 1.2))
 #' 
 #' # Plot results
-#' plot(FLStocks("FMSY" = fmsy_proj, "FMSY_Bounded" = fmsy_bounded))
+#' plot(FLStocks("FMSY"=fmsy_proj, "FMSY_Bounded"=fmsy_bounded))
 #' }
 #'
 #' @export
@@ -52,21 +52,21 @@ setGeneric("Fmsy", function(object, eql, ...) standardGeneric("Fmsy"))
 
 #' @rdname Fmsy
 #' @export
-setMethod("Fmsy", signature(object = "FLStock", eql = "FLBRP"),
-          function(object, eql, nits = 100, fmsy = NULL, 
-                   maxYear = dims(object)$maxyear + 25, 
-                   f_cv = 0.2, bnd = NULL, seed = 8778, ...) {
+setMethod("Fmsy", signature(object="FLStock", eql="FLBRP"),
+          function(object, eql, nits=100, fmsy=NULL, 
+                   maxYear=dims(object)$maxyear + 25, 
+                   fCV=0.2, bnd=NULL, seed=8778, ...) {
             
             # Set seed for reproducibility
             set.seed(seed)
             
             # Get current year and extend stock to projection period
-            currentYear <- dims(object)$maxyear
-            stk <- window(object, end = maxYear)
+            currentYear=dims(object)$maxyear
+            stk=window(object, end=maxYear)
             
             # Extract FMSY from reference points if not provided
             if (is.null(fmsy)) {
-              fmsy <- refpts(eql)["msy", "harvest", drop = TRUE]
+              fmsy=refpts(eql)["msy", "harvest", drop=TRUE]
             }
             
             # Check if FMSY is available
@@ -76,44 +76,47 @@ setMethod("Fmsy", signature(object = "FLStock", eql = "FLBRP"),
             }
             
             # Extract stock-recruitment relationship
-            sr_obj <- attributes(eql)$sr
-            if (is.null(sr_obj)) {
+            sr=attributes(eql)$sr
+            if (is.null(sr)) {
               stop("Stock-recruitment relationship not found in equilibrium object.")
             }
             
             # Calculate recruitment deviations
-            rec_hat <- predict(sr_obj)
-            rec_obs <- attributes(eql)$rec.obs
+            recHat=predict(sr)
+            recObs=attributes(eql)$rec.obs
             
-            if (is.null(rec_obs)) {
+            if (is.null(recObs)) {
               stop("Recruitment observations not found in equilibrium object.")
             }
             
             # Align recruitment data with predicted values
-            rec_obs <- rec_obs[, dimnames(rec_obs)$year %in% dimnames(rec_hat)$year]
-            rec_devs <- rec_obs / rec_hat
-            rec_devs <- rec_devs - median(rec_devs)
+            recObs=recObs[, dimnames(recObs)$year %in% dimnames(recHat)$year]
+            recDevs=recObs / recHat
+            recDevs=recDevs - median(recDevs)
             
             # Create recruitment deviations for projection period
-            rec_devs <- FLQuant(
-              sample(c(rec_devs), dim(rec_devs)[2] * nits, TRUE),
-              dimnames = list(year = currentYear:maxYear, iter = seq(nits))
+            recDevs=FLQuant(
+              sample(c(recDevs), dim(recDevs)[2] * nits, TRUE),
+              dimnames=list(year=currentYear:maxYear, iter=seq(nits))
             )
             
             # Create FMSY with uncertainty
-            fmsy_quant <- FLQuant(c(fmsy), dimnames = list(year = currentYear:maxYear))
-            fmsy_quant <- rlnorm(nits, log(fmsy_quant), f_cv)
+            ftar=FLQuant(c(fmsy), dimnames=list(year=currentYear:maxYear))
+            ftar=rlnorm(nits, log(ftar), fCV)
             
             # Ensure proper dimensions for FMSY quant
-            fmsy_quant <- propagate(fmsy_quant, nits)
+            ftar=propagate(ftar, nits)
             
             # Ensure recruitment deviations have proper dimensions
-            rec_devs <- propagate(rec_devs, nits)
+            recDevs=propagate(recDevs, nits)
+            
+            # Ensure both objects have the same year range
+            recDevs=recDevs[, dimnames(ftar)$year]
             
             # Perform stock projection
             if (is.null(bnd)) {
               # Simple projection without TAC bounds
-              stk <- fwd(stk, f = fmsy_quant, sr = eql, residuals = exp(rec_devs))
+              stk=fwd(stk, f=ftar, sr=eql, residuals=exp(recDevs))
             } else {
               # Projection with TAC bounds for stability
               if (length(bnd) != 2 || bnd[1] >= bnd[2]) {
@@ -122,19 +125,19 @@ setMethod("Fmsy", signature(object = "FLStock", eql = "FLBRP"),
               
               for (iYr in ac(currentYear:maxYear)) {
                 # Project with FMSY
-                stk <- fwd(stk, f = fmsy_quant[, iYr], sr = eql, residuals = exp(rec_devs))
+                stk=fwd(stk, f=ftar[, iYr], sr=eql, residuals=exp(recDevs))
                 
                 # Apply TAC bounds
-                prev_catch <- catch(stk)[, ac(as.numeric(iYr) - 1)]
-                current_catch <- catch(stk)[, iYr]
+                prev_catch=catch(stk)[, ac(as.numeric(iYr) - 1)]
+                current_catch=catch(stk)[, iYr]
                 
-                bounded_catch <- qmin(
+                bounded_catch=qmin(
                   qmax(current_catch, prev_catch * bnd[1]), 
                   prev_catch * bnd[2]
                 )
                 
                 # Re-project with bounded catch
-                stk <- fwd(stk, catch = bounded_catch, sr = eql, residuals = exp(rec_devs))
+                stk=fwd(stk, catch=bounded_catch, sr=eql, residuals=exp(recDevs))
               }
             }
             
@@ -143,16 +146,16 @@ setMethod("Fmsy", signature(object = "FLStock", eql = "FLBRP"),
 
 #' @rdname Fmsy
 #' @export
-setMethod("Fmsy", signature(object = "FLStocks", eql = "FLBRPs"),
-          function(object, eql, nits = 100, fmsy = NULL, 
-                   maxYear = NULL, f_cv = 0.2, bnd = NULL, seed = 8778, ...) {
+setMethod("Fmsy", signature(object="FLStocks", eql="FLBRPs"),
+          function(object, eql, nits=100, fmsy=NULL, 
+                   maxYear=NULL, fCV=0.2, bnd=NULL, seed=8778, ...) {
             
             # Set seed for reproducibility
             set.seed(seed)
             
             # Get common names
-            stock_names <- names(object)
-            eql_names <- names(eql)
+            stock_names=names(object)
+            eql_names=names(eql)
             
             if (!all(stock_names %in% eql_names)) {
               stop("Stock names must match equilibrium object names")
@@ -160,29 +163,61 @@ setMethod("Fmsy", signature(object = "FLStocks", eql = "FLBRPs"),
             
             # Set default maxYear if not provided
             if (is.null(maxYear)) {
-              maxYear <- max(sapply(object, function(x) dims(x)$maxyear)) + 25
+              maxYear=max(sapply(object, function(x) dims(x)$maxyear)) + 25
             }
             
             # Perform FMSY projections for each stock
-            results <- lapply(stock_names, function(stock_name) {
+            results=lapply(stock_names, function(stock_name) {
               tryCatch({
                 Fmsy(object[[stock_name]], eql[[stock_name]], 
-                     nits = nits, fmsy = fmsy, maxYear = maxYear, 
-                     f_cv = f_cv, bnd = bnd, seed = seed, ...)
-              }, error = function(e) {
+                     nits=nits, fmsy=fmsy, maxYear=maxYear, 
+                     fCV=fCV, bnd=bnd, seed=seed, ...)
+              }, error=function(e) {
                 warning(paste("Error projecting stock", stock_name, ":", e$message))
                 return(NULL)
               })
             })
             
             # Remove NULL results and create FLStocks object
-            valid_results <- results[!sapply(results, is.null)]
-            valid_names <- stock_names[!sapply(results, is.null)]
+            valid_results=results[!sapply(results, is.null)]
+            valid_names=stock_names[!sapply(results, is.null)]
             
             if (length(valid_results) == 0) {
               stop("No successful projections")
             }
             
-            names(valid_results) <- valid_names
+            names(valid_results)=valid_names
             return(FLStocks(valid_results))
           }) 
+
+
+
+FmsyV1<-function(stk,eql,nits=100,fmsy=benchmark(stk)["fmsy"],maxYear=dims(stk)$maxyear+25,f.cv=0.2,bnd=NA){
+  set.seed(8778)
+  
+  currentYear=dims(stk)$maxyear
+  stk    =fwdWindow(stk,end=maxYear)
+  
+  if (is.na(fmsy)) return(NULL)
+  
+  recHat =predict(attributes(eql)$sr)
+  recObs =attributes(eql)$rec.obs
+  recObs =recObs[,dimnames(recObs)$year%in%dimnames(recHat)$year]
+  recDevs=recObs%/%recHat  
+  recDevs=recDevs-median(recDevs)
+  
+  recDevs=FLQuant(sample(c(recDevs),dim(recDevs)[2]*nits,TRUE),
+                  dimnames=list(year=currentYear:maxYear,iter=seq(nits)))
+  
+  fmsy   =FLQuant(c(fmsy),dimnames=list(year=currentYear:maxYear))
+  fmsy   =rlnorm(nits,log(fmsy),f.cv)
+  
+  if (any(is.na(bnd)))
+    stk=fwd(stk,f=fmsy,sr=eql,deviances=exp(recDevs))
+  else{
+    for (iYr in ac((currentYear):maxYear)){
+      stk=fwd(stk,f=fmsy[,iYr],sr=eql,deviances=exp(recDevs))
+      ctc=qmin(qmax(catch(stk)[,iYr],catch(stk)[,ac(an(iYr)-1)]*bnd[1]),catch(stk)[,ac(an(iYr)-1)]*bnd[2])
+      stk=fwd(stk,catch=ctc,sr=eql,deviances=exp(recDevs))}}
+  
+  stk}  
