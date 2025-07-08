@@ -41,13 +41,20 @@ setMethod("eql", signature(object="FLStock"),
                           rtn$sp[-dim(rtn)[1]],NA))/rtn$ssb
               
               rtn}
-            
+
             spr0=spr0Yr(object)
             sr  =as.FLSR(object,model=model)
-            sr  =FLCandy:::ftmb(sr,s.est =T,
-                                s        =0.7, #fishlife(object)["s"],
-                                s.logitsd=0.4, #fishlife(object)["sd.logit.s"],
-                                spr0     =spr0)
+
+            if (model!="segreg"){
+              sr  =FLCandy:::ftmb(sr,s.est =T,
+                                  s        =0.7, #fishlife(object)["s"],
+                                  s.logitsd=0.4, #fishlife(object)["sd.logit.s"],
+                                  spr0     =spr0)
+            }else{
+              sr  =FLCandy:::ftmb(sr,s.est =T,
+                           inflect  =benchmark(object)["blim",drop=TRUE],
+                            spr0     =spr0)
+            }
             
             rtn=brp(FLBRP(object,nyears=dim(object)[2],
                           sr=list(model =do.call(gsub("SV","", model),list())$model,

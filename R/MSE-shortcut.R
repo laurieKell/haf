@@ -239,21 +239,21 @@ ensurePositive <- function(stk) {
   return(stk)
 }
 
-#' Benchmark function to extract reference points
-#' @param stk FLStock object
-#' @param eql FLBRP object
-#' @return Named vector with benchmark values
-benchmark <- function(stk, eql) {
-  # Extract reference points from equilibrium object
-  refs <- refpts(eql)
-  
-  # Create benchmark vector with common reference points
-  bench <- c(
-    fmsy = refs["msy", "harvest", drop = TRUE],
-    btrigger = refs["msy", "ssb", drop = TRUE] * 0.8,  # Common default
-    blim = refs["msy", "ssb", drop = TRUE] * 0.5       # Common default
-  )
-  
-  return(bench)
-}
+#' #' Benchmark function to extract reference points
+#' #' @param stk FLStock object
+#' #' @param eql FLBRP object
+#' #' @return Named vector with benchmark values
+#' benchmark <- function(stk, eql) {
+#'   # Extract reference points from equilibrium object
+#'   refs <- refpts(eql)
+#'   
+#'   # Create benchmark vector with common reference points
+#'   bench <- c(
+#'     fmsy = refs["msy", "harvest", drop = TRUE],
+#'     btrigger = refs["msy", "ssb", drop = TRUE] * 0.8,  # Common default
+#'     blim = refs["msy", "ssb", drop = TRUE] * 0.5       # Common default
+#'   )
+#'   
+#'   return(bench)
+#' }
 
