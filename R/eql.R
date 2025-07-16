@@ -21,12 +21,12 @@
 #' 
 #' @rdname eql
 #' @export
-setGeneric("eql", function(object, model) standardGeneric("eql"))
+setGeneric("eql", function(object, model,...) standardGeneric("eql"))
 
 #' @rdname eql
 #' @export
 setMethod("eql", signature(object="FLStock"),
-          eqFn<-function(object,model="bevholtSV"){
+          eqFn<-function(object,model="bevholtSV",nyears=dim(object)[2]){
             
             spFn<-function(x){
               rfs=FLPar(c(ssb.obs(x)),dimnames=list(refpts="ssb",
@@ -42,7 +42,7 @@ setMethod("eql", signature(object="FLStock"),
               
               rtn}
 
-            spr0=spr0Yr(object)
+            spr0=mean(spr0Yr(object)[,dim(object)[2]-(1:nyears)+1])
             sr  =as.FLSR(object,model=model)
 
             if (model!="segreg"){
@@ -52,11 +52,12 @@ setMethod("eql", signature(object="FLStock"),
                                   spr0     =spr0)
             }else{
               sr  =FLCandy:::ftmb(sr,s.est =T,
-                           inflect  =benchmark(object)["blim",drop=TRUE],
-                            spr0     =spr0)
-            }
+                           inflect  =ifelse("benchmark"%in%names(attributes(object)),
+                                            benchmark(object)["blim",drop=TRUE],NA),
+                           spr0     =spr0)
+          }
             
-            rtn=brp(FLBRP(object,nyears=dim(object)[2],
+            rtn=brp(FLBRP(object,nyears=nyears,
                           sr=list(model =do.call(gsub("SV","", model),list())$model,
                                   params=FLPar(apply(params(sr),1,median)))))
             
@@ -67,6 +68,9 @@ setMethod("eql", signature(object="FLStock"),
             attributes(rtn)[["eb.obs"]] =ebiomass(object)
             attributes(rtn)[["priors"]] =FLCandy:::tryIt(FLCandy:::calcPriors(rtn))
             attributes(rtn)[["prior2"]] =FLCandy:::tryIt(FLCandy:::getPriors(rtn))
+            
+            if ("benchmark"%in%names(attributes(object)))
+              attributes(rtn)[["benchmark"]]=benchmark(object)
             
             return(rtn)})
 
