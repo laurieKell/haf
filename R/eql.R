@@ -26,7 +26,8 @@ setGeneric("eql", function(object, model,...) standardGeneric("eql"))
 #' @rdname eql
 #' @export
 setMethod("eql", signature(object="FLStock"),
-          eqFn<-function(object,model="bevholtSV",nyears=dim(object)[2]){
+          eqFn<-function(object,model="bevholtSV",nyears=dim(object)[2],
+                         prior_s=NULL,cv_s=NULL,prior_r0=NULL,cv_r0=NULL){
             
             spFn<-function(x){
               rfs=FLPar(c(ssb.obs(x)),dimnames=list(refpts="ssb",
@@ -46,15 +47,16 @@ setMethod("eql", signature(object="FLStock"),
             sr  =as.FLSR(object,model=model)
 
             if (model!="segreg"){
-              sr  =FLCandy:::ftmb(sr,s.est =T,
+              sr  =FLCandy:::ftmb2(sr,s.est =T,
                                   s        =0.7, #fishlife(object)["s"],
                                   s.logitsd=0.4, #fishlife(object)["sd.logit.s"],
-                                  spr0     =spr0)
+                                  spr0     =spr0,
+                                  prior_s=prior_s,cv_s=cv_s,prior_r0=prior_r0,cv_r0=cv_r0)
             }else{
-              sr  =FLCandy:::ftmb(sr,s.est =T,
+              sr  =FLCandy:::ftmb2(sr,s.est =T,
                            inflect  =ifelse("benchmark"%in%names(attributes(object)),
                                             benchmark(object)["blim",drop=TRUE],NA),
-                           spr0     =spr0)
+                           spr0=spr0)
           }
             
             rtn=brp(FLBRP(object,nyears=nyears,
