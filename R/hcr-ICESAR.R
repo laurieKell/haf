@@ -48,7 +48,7 @@
 #'   fmin = 0.05      # Minimum fishing mortality
 #' )
 #' 
-#' # Run HCR simulation
+#' # Example
 #' result <- hcrICESAR(ple4, eql, sr_deviances, params, 
 #'                   start = 2010, end = 2030)
 #' }

@@ -15,7 +15,7 @@
 #' @examples
 #' \dontrun{
 #' data(ple4)
-#' eql <- eql(ple4, model="rickerSV")
+#' eql=eql(ple4, model="rickerSV")
 #' summary(eql)
 #' }
 #' 
@@ -42,29 +42,40 @@ setMethod("eql", signature(object="FLStock"),
                           rtn$sp[-dim(rtn)[1]],NA))/rtn$ssb
               
               rtn}
-
-            spr0=mean(spr0Yr(object)[,dim(object)[2]-(1:nyears)+1])
+      
             sr  =as.FLSR(object,model=model)
-
+            spr0=mean(FLCandy:::spr0Yr(object)[,dim(object)[2]-(1:nyears)+1])
+            
             if (model!="segreg"){
               sr  =FLCandy:::ftmb2(sr,s.est =T,
-                                  s        =0.7, #fishlife(object)["s"],
-                                  s.logitsd=0.4, #fishlife(object)["sd.logit.s"],
-                                  spr0     =spr0,
-                                  prior_s=prior_s,cv_s=cv_s,prior_r0=prior_r0,cv_r0=cv_r0)
+                                   s        =0.7, #fishlife(object)["s"],
+                                   s.logitsd=0.4, #fishlife(object)["sd.logit.s"],
+                                   spr0     =spr0,
+                                   prior_s=prior_s,cv_s=cv_s,prior_r0=prior_r0,cv_r0=cv_r0)
             }else{
               sr  =FLCandy:::ftmb2(sr,s.est =T,
                            inflect  =ifelse("benchmark"%in%names(attributes(object)),
                                             benchmark(object)["blim",drop=TRUE],NA),
-                           spr0=spr0)
-          }
+                           spr0=spr0)}
             
+            # ftmb2 should always return an FLSR object
+            if(is(sr, "FLPar")) {
+              # If ftmb2 returned FLPar, create FLSR object
+              sr_params=FLPar(apply(sr,1,median))
+              sr_obj=as.FLSR(object, model=model)
+              params(sr_obj)=sr_params
+            } else {
+              # ftmb2 returned FLSR object
+              sr_params=FLPar(apply(params(sr),1,median))
+              sr_obj=sr
+            }
+          
             rtn=brp(FLBRP(object,nyears=nyears,
                           sr=list(model =do.call(gsub("SV","", model),list())$model,
-                                  params=FLPar(apply(params(sr),1,median)))))
-            
-            attributes(rtn)[["sr"]]     =sr
-            attributes(rtn)[["logLik"]] =logLik(sr)
+                                  params=sr_params)))
+         
+            attributes(rtn)[["sr"]]     =sr_obj
+            attributes(rtn)[["logLik"]] =logLik(sr_obj)
             attributes(rtn)[["prod"]]   =spFn(rtn)
             attributes(rtn)[["tseries"]]=FLCandy:::tseries(object)
             attributes(rtn)[["eb.obs"]] =ebiomass(object)
@@ -82,3 +93,18 @@ setMethod("eql", signature(object="FLStock"),
 spr0Yr <- function(object) {
   FLCandy:::spr0Yr(object)
   }
+
+bootFLSR<-function(x,nits){
+  
+  sample()
+  
+}
+
+# Run the comparison
+# results=compare_segreg_fits(icesdata[[3]], spr0(icesdata[[1]])[drop=T])
+# 
+# # Access specific results
+# results$parameters$ftmb
+# results$parameters$fmle
+# results$likelihoods$ftmb
+# results$likelihoods$fmle

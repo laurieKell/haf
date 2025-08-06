@@ -45,11 +45,31 @@ result <- hcrICESAR(ple4, eql, sr_deviances, params,
 
 # Create HCR visualization
 hcrPlot2(btarget = 1.0, blim = 0.1, ftarget = 0.8)
+
+# Bootstrap analysis of stock-recruitment relationship
+boot_eql <- bootstrapFLSR(ple4, sr_obj, nits = 100)
 ```
 
 ## Available Harvest Control Rules
 
-### 1. Hockey-Stick HCR (Category 1 & 2 stocks)
+### 1. Equilibrium Analysis and Bootstrap
+
+The package provides tools for fitting stock-recruitment relationships and quantifying uncertainty:
+
+```r
+# Fit stock-recruitment relationship
+eql_obj <- eql(stock, model="bevholtSV")
+
+# Bootstrap analysis for uncertainty quantification
+boot_eql <- bootstrapFLSR(stock, sr_obj, nits=100)
+```
+
+**Features:**
+- Multiple SRR models (Beverton-Holt, Ricker, Segmented)
+- Bootstrap resampling for uncertainty analysis
+- Reference point calculation with confidence intervals
+
+### 2. Hockey-Stick HCR (Category 1 & 2 stocks)
 
 The standard ICES approach for well-assessed stocks:
 
